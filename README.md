@@ -77,6 +77,7 @@
 - `playerActions[]`: 多人模式行动数组（每项含 `playerId + action + state`）
 - `transfers[]`: 多人资源分享数组（每项含 `fromPlayerId + toPlayerId + resource + amount`）
 - `trustMatrix[]`: 玩家信任矩阵（每项含 `fromPlayerId + toPlayerId + value`）
+- `betrayalActions[]`: 背刺动作数组（每项含 `actorPlayerId + targetPlayerId + type`）
 
 ### 回合输出（RoundResult）
 
@@ -102,6 +103,13 @@
     - `isHidden`: 是否私下交易（仅双方可见）
     - `requiresTrust`: 最低信任值门槛，未达到则阻断
   - 多人返回新增：`transferResults[]`（每笔分享状态，如 `applied` / `blocked_trust`）
+  - 背刺动作 `type`（MVP）：
+    - `hide_supply`（隐瞒补给）
+    - `refuse_share`（拒绝分享）
+    - `fake_info`（提供假信息）
+  - 多人返回新增：
+    - `betrayalResults[]`（背刺执行结果）
+    - `trustMatrix[]`（回合后信任矩阵快照）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -146,6 +154,7 @@
 - 新增多人 `playerActions[]` 逐玩家结算输出（`perPlayerResults`），对接多人回合制。
 - 新增多人资源分享 `transfers[]` 联动结算（如分享水/食物）。
 - 新增私下交易与信任门槛规则（`isHidden` + `requiresTrust` + `trustMatrix`）。
+- 新增背刺动作规则（`betrayalActions[]`）并联动信任值与目标心理压力。
 
 ### 已知风险与待改进
 

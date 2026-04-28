@@ -78,6 +78,30 @@ function recalculateDelta(baseState, nextState) {
   };
 }
 
+function setTrustValue(trustMap, fromId, toId, value) {
+  trustMap.set(`${fromId}->${toId}`, clamp(value));
+}
+
+function buildTrustMap(trustMatrix = []) {
+  const trustMap = new Map();
+  for (const item of trustMatrix) {
+    const fromId = item?.fromPlayerId;
+    const toId = item?.toPlayerId;
+    if (!fromId || !toId) continue;
+    setTrustValue(trustMap, fromId, toId, Number(item?.value || 0));
+  }
+  return trustMap;
+}
+
+function trustMatrixFromMap(trustMap) {
+  const result = [];
+  for (const [key, value] of trustMap.entries()) {
+    const [fromPlayerId, toPlayerId] = key.split("->");
+    result.push({ fromPlayerId, toPlayerId, value });
+  }
+  return result;
+}
+
 function getTrustValue(trustMatrix, fromId, toId) {
   const found = trustMatrix.find((t) => t?.fromPlayerId === fromId && t?.toPlayerId === toId);
   return Number(found?.value ?? 0);
@@ -161,6 +185,58 @@ function applyResourceTransfers(perPlayerResults, transfers = [], trustMatrix = 
   return { perPlayerResults, transferResults };
 }
 
+function applyBetrayalActions(perPlayerResults, betrayalActions = [], trustMap) {
+  if (!Array.isArray(betrayalActions) || betrayalActions.length === 0) return [];
+  const byId = new Map(perPlayerResults.map((r) => [r.playerId, r]));
+  const results = [];
+
+  for (const action of betrayalActions) {
+    const actorId = action?.actorPlayerId;
+    const targetId = action?.targetPlayerId;
+    const type = action?.type;
+    if (!actorId || !targetId || actorId === targetId) {
+      results.push({ ...action, status: "rejected_invalid_players" });
+      continue;
+    }
+    if (!["hide_supply", "refuse_share", "fake_info"].includes(type)) {
+      results.push({ ...action, status: "rejected_invalid_type" });
+      continue;
+    }
+    const actor = byId.get(actorId);
+    const target = byId.get(targetId);
+    if (!actor || !target) {
+      results.push({ ...action, status: "rejected_player_not_found" });
+      continue;
+    }
+
+    let trustDrop = 10;
+    let stressUp = 4;
+    if (type === "refuse_share") {
+      trustDrop = 12;
+      stressUp = 3;
+    } else if (type === "fake_info") {
+      trustDrop = 18;
+      stressUp = 6;
+    }
+
+    const key = `${actorId}->${targetId}`;
+    const currentTrust = Number(trustMap.get(key) ?? 0);
+    setTrustValue(trustMap, actorId, targetId, currentTrust - trustDrop);
+
+    target.nextState.stress = clamp(target.nextState.stress + stressUp);
+    target.numericDelta = recalculateDelta(target.baseState, target.nextState);
+
+    results.push({
+      ...action,
+      status: "applied",
+      trustDelta: -trustDrop,
+      stressDeltaToTarget: stressUp
+    });
+  }
+
+  return results;
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -170,6 +246,7 @@ export function resolveRound(input) {
   const players = Array.isArray(input?.players) ? input.players : [];
   const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
   const transfers = Array.isArray(input?.transfers) ? input.transfers : [];
+  const betrayalActions = Array.isArray(input?.betrayalActions) ? input.betrayalActions : [];
   const trustMatrix = Array.isArray(input?.trustMatrix) ? input.trustMatrix : [];
   const viewerPlayerId = input?.viewerPlayerId;
   const action = input?.action;
@@ -178,6 +255,7 @@ export function resolveRound(input) {
   const visibleEvents = filterVisibleEvents(events, viewerPlayerId);
 
   if (playerActions.length > 0) {
+    const trustMap = buildTrustMap(trustMatrix);
     const perPlayerResults = playerActions.map((entry) => {
       const playerId = entry?.playerId || "unknown";
       const playerState = { ...INITIAL_STATS, ...(entry?.state || {}) };
@@ -196,7 +274,12 @@ export function resolveRound(input) {
       };
     });
 
-    const { transferResults } = applyResourceTransfers(perPlayerResults, transfers, trustMatrix);
+    const { transferResults } = applyResourceTransfers(
+      perPlayerResults,
+      transfers,
+      trustMatrixFromMap(trustMap)
+    );
+    const betrayalResults = applyBetrayalActions(perPlayerResults, betrayalActions, trustMap);
 
     for (const player of perPlayerResults) {
       delete player.baseState;
@@ -205,7 +288,9 @@ export function resolveRound(input) {
     return {
       events,
       visibleEvents,
+      trustMatrix: trustMatrixFromMap(trustMap),
       transferResults,
+      betrayalResults,
       perPlayerResults
     };
   }

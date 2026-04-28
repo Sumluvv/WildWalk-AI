@@ -230,3 +230,24 @@ test("transfer with unmet trust requirement is blocked", () => {
   assert.ok(p1.visibleTransfers.length === 1);
   assert.ok(p2.visibleTransfers.length === 1);
 });
+
+test("betrayal action reduces trust and increases target stress", () => {
+  const result = resolveRound({
+    seed: 301,
+    round: 6,
+    players: [{ id: "A" }, { id: "B" }],
+    playerActions: [
+      { playerId: "A", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "B", action: "camp", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    betrayalActions: [{ actorPlayerId: "A", targetPlayerId: "B", type: "fake_info" }],
+    trustMatrix: [{ fromPlayerId: "A", toPlayerId: "B", value: 80 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  assert.equal(result.betrayalResults[0].status, "applied");
+  const trust = result.trustMatrix.find((x) => x.fromPlayerId === "A" && x.toPlayerId === "B");
+  assert.ok(trust.value < 80);
+  const target = result.perPlayerResults.find((p) => p.playerId === "B");
+  assert.ok(target.nextState.stress > 20);
+});

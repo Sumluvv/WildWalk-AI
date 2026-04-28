@@ -148,3 +148,35 @@ test("hidden transfer is not visible to unrelated viewer", async (t) => {
   assert.ok(Array.isArray(p3.visibleTransfers));
   assert.equal(p3.visibleTransfers.length, 0);
 });
+
+test("betrayalActions are returned with trust matrix updates", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    seed: 41,
+    round: 4,
+    viewerPlayerId: "A",
+    players: [{ id: "A" }, { id: "B" }],
+    playerActions: [
+      { playerId: "A", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "B", action: "camp", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    betrayalActions: [{ actorPlayerId: "A", targetPlayerId: "B", type: "hide_supply" }],
+    trustMatrix: [{ fromPlayerId: "A", toPlayerId: "B", value: 65 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/round/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(data.betrayalResults));
+  assert.equal(data.betrayalResults[0].status, "applied");
+  const trust = data.trustMatrix.find((x) => x.fromPlayerId === "A" && x.toPlayerId === "B");
+  assert.ok(trust.value < 65);
+});
