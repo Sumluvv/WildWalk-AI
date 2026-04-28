@@ -4,7 +4,7 @@ import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
-import { createMatch } from "./matchStore.js";
+import { createMatch, joinMatch, markReady, startMatch, getMatch } from "./matchStore.js";
 import { SCENARIOS, SCENARIO_DETAILS } from "../data/scenarios.js";
 
 function json(res, statusCode, payload) {
@@ -49,6 +49,80 @@ export function createAppServer() {
           ...match,
           scenario
         });
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/v1/matches/")) {
+      const matchId = req.url.slice("/v1/matches/".length);
+      if (!matchId.includes("/")) {
+        const match = getMatch(matchId);
+        if (!match) return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        return json(res, 200, match);
+      }
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/v1/matches/") && req.url.endsWith("/join")) {
+      try {
+        const prefix = "/v1/matches/";
+        const suffix = "/join";
+        const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+        const body = await readJsonBody(req);
+        const result = joinMatch(matchId, body);
+        if (result.error === "NOT_FOUND") {
+          return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        }
+        if (result.error) {
+          return json(res, 400, { error: "BAD_REQUEST", message: result.error });
+        }
+        return json(res, 200, result.match);
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/v1/matches/") && req.url.endsWith("/ready")) {
+      try {
+        const prefix = "/v1/matches/";
+        const suffix = "/ready";
+        const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+        const body = await readJsonBody(req);
+        const result = markReady(matchId, body?.playerId, body?.ready);
+        if (result.error === "NOT_FOUND") {
+          return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        }
+        if (result.error) {
+          return json(res, 400, { error: "BAD_REQUEST", message: result.error });
+        }
+        return json(res, 200, result.match);
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/v1/matches/") && req.url.endsWith("/start")) {
+      try {
+        const prefix = "/v1/matches/";
+        const suffix = "/start";
+        const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+        const result = startMatch(matchId);
+        if (result.error === "NOT_FOUND") {
+          return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        }
+        if (result.error) {
+          return json(res, 400, { error: "BAD_REQUEST", message: result.error });
+        }
+        return json(res, 200, result.match);
       } catch (error) {
         return json(res, 400, {
           error: "BAD_REQUEST",

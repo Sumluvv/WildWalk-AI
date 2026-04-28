@@ -24,3 +24,45 @@ export function createMatch({ scenarioId }) {
 export function getMatch(matchId) {
   return matches.get(matchId) || null;
 }
+
+export function joinMatch(matchId, player) {
+  const match = matches.get(matchId);
+  if (!match) return { error: "NOT_FOUND" };
+  if (match.status !== "waiting") return { error: "MATCH_ALREADY_STARTED" };
+  const playerId = player?.playerId;
+  const nickname = player?.nickname || playerId;
+  if (!playerId) return { error: "INVALID_PLAYER" };
+
+  const exists = match.partyState.players.some((p) => p.playerId === playerId);
+  if (exists) return { error: "PLAYER_ALREADY_JOINED" };
+
+  match.partyState.players.push({
+    playerId,
+    nickname,
+    isReady: false,
+    joinedAt: new Date().toISOString()
+  });
+  return { match };
+}
+
+export function markReady(matchId, playerId, ready = true) {
+  const match = matches.get(matchId);
+  if (!match) return { error: "NOT_FOUND" };
+  const player = match.partyState.players.find((p) => p.playerId === playerId);
+  if (!player) return { error: "PLAYER_NOT_FOUND" };
+  player.isReady = Boolean(ready);
+  return { match };
+}
+
+export function startMatch(matchId) {
+  const match = matches.get(matchId);
+  if (!match) return { error: "NOT_FOUND" };
+  if (match.status !== "waiting") return { error: "MATCH_ALREADY_STARTED" };
+  if (match.partyState.players.length < 2) return { error: "NEED_MORE_PLAYERS" };
+  const allReady = match.partyState.players.every((p) => p.isReady);
+  if (!allReady) return { error: "PLAYERS_NOT_READY" };
+
+  match.status = "in_progress";
+  match.startedAt = new Date().toISOString();
+  return { match };
+}

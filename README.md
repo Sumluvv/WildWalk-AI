@@ -147,6 +147,14 @@
   - 用途：根据路线创建新对局（开局入口）
   - 请求体：`{ scenarioId }`
   - 返回：`{ matchId, scenarioId, round, status, partyState, scenario }`
+- `POST /v1/matches/:matchId/join`
+  - 用途：玩家加入房间
+  - 请求体：`{ playerId, nickname }`
+- `POST /v1/matches/:matchId/ready`
+  - 用途：玩家准备状态切换
+  - 请求体：`{ playerId, ready }`
+- `POST /v1/matches/:matchId/start`
+  - 用途：房间开局（需至少 2 人且全员 ready）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -205,6 +213,7 @@
 - 新增 `GET /v1/scenarios`，支持“选路线”页面直接拉取路线列表。
 - 新增 `GET /v1/scenarios/:scenarioId`，支持“路线详情页”展示。
 - 新增 `POST /v1/matches`，支持从路线详情页一键开局。
+- 新增 `join/ready/start` 房间流程接口，打通“创建房间 -> 准备 -> 开局”。
 
 ### 已知风险与待改进
 

@@ -80,6 +80,53 @@ test("POST /v1/matches rejects invalid scenarioId", async (t) => {
   assert.equal(data.error, "BAD_REQUEST");
 });
 
+test("match join and start flow works", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+  assert.equal(createRes.status, 200);
+
+  const joinARes = await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  assert.equal(joinARes.status, 200);
+
+  const joinBRes = await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  assert.equal(joinBRes.status, 200);
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+
+  const startRes = await fetch(`${baseUrl}/v1/matches/${matchId}/start`, {
+    method: "POST"
+  });
+  const started = await startRes.json();
+
+  assert.equal(startRes.status, 200);
+  assert.equal(started.status, "in_progress");
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());
