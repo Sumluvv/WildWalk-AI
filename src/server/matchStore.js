@@ -66,3 +66,18 @@ export function startMatch(matchId) {
   match.startedAt = new Date().toISOString();
   return { match };
 }
+
+export function applyTurnResult(matchId, payload = {}) {
+  const match = matches.get(matchId);
+  if (!match) return { error: "NOT_FOUND" };
+  if (match.status !== "in_progress") return { error: "MATCH_NOT_IN_PROGRESS" };
+
+  match.lastTurn = {
+    round: match.round,
+    resolvedAt: new Date().toISOString(),
+    ...payload
+  };
+  match.round += 1;
+  match.updatedAt = new Date().toISOString();
+  return { match };
+}

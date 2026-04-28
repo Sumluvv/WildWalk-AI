@@ -155,6 +155,10 @@
   - 请求体：`{ playerId, ready }`
 - `POST /v1/matches/:matchId/start`
   - 用途：房间开局（需至少 2 人且全员 ready）
+- `POST /v1/matches/:matchId/resolve-turn`
+  - 用途：按房间当前回合自动结算并推进回合号
+  - 请求体：回合输入（如 `playerActions/environment/viewerPlayerId`）
+  - 返回：`{ match, roundResult..., narration, narrationSource }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -214,6 +218,7 @@
 - 新增 `GET /v1/scenarios/:scenarioId`，支持“路线详情页”展示。
 - 新增 `POST /v1/matches`，支持从路线详情页一键开局。
 - 新增 `join/ready/start` 房间流程接口，打通“创建房间 -> 准备 -> 开局”。
+- 新增 `resolve-turn` 房间回合接口，减少前端拼装回合上下文的负担。
 
 ### 已知风险与待改进
 

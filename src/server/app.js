@@ -4,7 +4,14 @@ import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
-import { createMatch, joinMatch, markReady, startMatch, getMatch } from "./matchStore.js";
+import {
+  createMatch,
+  joinMatch,
+  markReady,
+  startMatch,
+  getMatch,
+  applyTurnResult
+} from "./matchStore.js";
 import { SCENARIOS, SCENARIO_DETAILS } from "../data/scenarios.js";
 
 function json(res, statusCode, payload) {
@@ -123,6 +130,57 @@ export function createAppServer() {
           return json(res, 400, { error: "BAD_REQUEST", message: result.error });
         }
         return json(res, 200, result.match);
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/v1/matches/") && req.url.endsWith("/resolve-turn")) {
+      try {
+        const prefix = "/v1/matches/";
+        const suffix = "/resolve-turn";
+        const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+        const match = getMatch(matchId);
+        if (!match) return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        if (match.status !== "in_progress") {
+          return json(res, 400, { error: "BAD_REQUEST", message: "MATCH_NOT_IN_PROGRESS" });
+        }
+
+        const body = await readJsonBody(req);
+        const roundInput = {
+          ...body,
+          matchId,
+          round: match.round,
+          players: match.partyState.players.map((p) => ({ id: p.playerId }))
+        };
+        const roundResult = resolveRound(roundInput);
+        const narration = renderNarrationPreview(roundResult?.narrativePacket || {});
+
+        appendMatchLog(matchId, {
+          round: match.round,
+          narration,
+          narrativePacket: roundResult?.narrativePacket || null,
+          keyChanges: {
+            trustChanges: roundResult?.trustChanges || [],
+            disclosureConsequences: roundResult?.disclosureConsequences || [],
+            transferResults: roundResult?.transferResults || [],
+            betrayalResults: roundResult?.betrayalResults || []
+          }
+        });
+
+        const applied = applyTurnResult(matchId, { roundResult });
+        if (applied.error) {
+          return json(res, 400, { error: "BAD_REQUEST", message: applied.error });
+        }
+        return json(res, 200, {
+          match: applied.match,
+          ...roundResult,
+          narration,
+          narrationSource: "template-preview"
+        });
       } catch (error) {
         return json(res, 400, {
           error: "BAD_REQUEST",

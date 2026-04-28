@@ -127,6 +127,61 @@ test("match join and start flow works", async (t) => {
   assert.equal(started.status, "in_progress");
 });
 
+test("POST /v1/matches/:id/resolve-turn resolves and advances round", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+  assert.equal(createRes.status, 200);
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/start`, { method: "POST" });
+
+  const resolveRes = await fetch(`${baseUrl}/v1/matches/${matchId}/resolve-turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      viewerPlayerId: "P1",
+      playerActions: [
+        { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+        { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+      ],
+      environment: { weather: "cloudy", slope: "flat" }
+    })
+  });
+  const resolved = await resolveRes.json();
+
+  assert.equal(resolveRes.status, 200);
+  assert.ok(resolved.match);
+  assert.equal(typeof resolved.narration, "string");
+  assert.equal(resolved.match.round, 2);
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());
