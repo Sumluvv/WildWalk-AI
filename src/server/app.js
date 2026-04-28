@@ -65,6 +65,74 @@ export function createAppServer() {
       }
     }
 
+    if (req.method === "POST" && req.url === "/v1/demo/run-once") {
+      try {
+        const body = await readJsonBody(req);
+        const scenarioId = body?.scenarioId || "kyoto-daimonji";
+        const scenario = SCENARIOS.find((s) => s.id === scenarioId);
+        if (!scenario) {
+          return json(res, 400, { error: "BAD_REQUEST", message: "Invalid scenarioId" });
+        }
+
+        const created = createMatch({ scenarioId });
+        const matchId = created.matchId;
+        joinMatch(matchId, { playerId: "P1", nickname: "Alice" });
+        joinMatch(matchId, { playerId: "P2", nickname: "Bob" });
+        markReady(matchId, "P1", true);
+        markReady(matchId, "P2", true);
+        startMatch(matchId);
+
+        const roundInput = {
+          matchId,
+          round: created.round,
+          viewerPlayerId: "P1",
+          players: [{ id: "P1" }, { id: "P2" }],
+          playerActions: [
+            { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+            { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+          ],
+          environment: { weather: "cloudy", slope: "flat" }
+        };
+        const roundResult = resolveRound(roundInput);
+        const narration = renderNarrationPreview(roundResult?.narrativePacket || {});
+        appendMatchLog(matchId, {
+          round: created.round,
+          narration,
+          narrativePacket: roundResult?.narrativePacket || null,
+          keyChanges: {
+            trustChanges: roundResult?.trustChanges || [],
+            disclosureConsequences: roundResult?.disclosureConsequences || [],
+            transferResults: roundResult?.transferResults || [],
+            betrayalResults: roundResult?.betrayalResults || []
+          }
+        });
+        applyTurnResult(matchId, { roundResult });
+        const finished = finishMatch(matchId, body?.finishReason || "summit_success");
+        const finalMatch = finished.match;
+        const logs = getMatchLogs(matchId);
+
+        return json(res, 200, {
+          matchId,
+          scenario,
+          roundResult,
+          narration,
+          finalMatch,
+          summary: {
+            matchId,
+            rounds: logs.length,
+            badge: buildMatchBadge(matchId, logs),
+            diary: buildMatchDiary(matchId, logs),
+            logs
+          }
+        });
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
     if (req.method === "GET" && req.url.startsWith("/v1/matches/")) {
       const matchId = req.url.slice("/v1/matches/".length);
       if (!matchId.includes("/")) {

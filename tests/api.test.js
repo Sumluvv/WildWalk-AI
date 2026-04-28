@@ -80,6 +80,25 @@ test("POST /v1/matches rejects invalid scenarioId", async (t) => {
   assert.equal(data.error, "BAD_REQUEST");
 });
 
+test("POST /v1/demo/run-once returns end-to-end playable summary", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/demo/run-once`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji", finishReason: "summit_success" })
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(typeof data.matchId, "string");
+  assert.equal(data.finalMatch.status, "finished");
+  assert.equal(typeof data.narration, "string");
+  assert.ok(data.summary);
+  assert.ok(Array.isArray(data.summary.logs));
+});
+
 test("match join and start flow works", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());

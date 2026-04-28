@@ -163,6 +163,10 @@
   - 用途：结束对局并写入结束原因
   - 请求体：`{ reason }`
   - reason 枚举：`summit_success` / `all_dead` / `rescue_abort`
+- `POST /v1/demo/run-once`
+  - 用途：一键执行 MVP 端到端演示流程（建房->加入->开局->一回合->结束->总结）
+  - 请求体：`{ scenarioId?, finishReason? }`
+  - 返回：`{ matchId, scenario, roundResult, narration, finalMatch, summary }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -224,6 +228,7 @@
 - 新增 `join/ready/start` 房间流程接口，打通“创建房间 -> 准备 -> 开局”。
 - 新增 `resolve-turn` 房间回合接口，减少前端拼装回合上下文的负担。
 - 新增 `finish` 对局结束接口，覆盖登顶成功/全灭/救援中止。
+- 新增 `demo/run-once` 一键试玩接口，用于快速演示整条玩法链路。
 
 ### 已知风险与待改进
 
