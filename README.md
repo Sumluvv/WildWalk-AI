@@ -131,6 +131,9 @@
 - `GET /v1/match/:matchId/diary`
   - 用途：基于日志生成“徒步日记”文本（MVP 模板版）
   - 返回：`{ matchId, diary, rounds }`
+- `GET /v1/match/:matchId/badge`
+  - 用途：基于日志统计生成“航迹勋章”与称号（MVP 规则版）
+  - 返回：`{ matchId, level, title, stats }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -184,6 +187,7 @@
 - 新增 `POST /v1/round/resolve-and-narrate` 一体化接口，便于前端单次调用。
 - 新增对局日志接口（内存版），用于“徒步日记”与“航迹勋章”后续能力衔接。
 - 新增 `GET /v1/match/:matchId/diary`，可直接产出中文日记预览。
+- 新增 `GET /v1/match/:matchId/badge`，可返回称号、等级与关键统计。
 
 ### 已知风险与待改进
 

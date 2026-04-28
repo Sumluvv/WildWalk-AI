@@ -344,3 +344,39 @@ test("GET /v1/match/:id/diary returns generated diary text", async (t) => {
   assert.ok(diaryData.diary.includes("徒步日记"));
   assert.ok(diaryData.diary.includes("第 1 回合"));
 });
+
+test("GET /v1/match/:id/badge returns badge summary", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const matchId = "demo-match-3";
+  const payload = {
+    matchId,
+    seed: 1003,
+    round: 1,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+    ],
+    transfers: [{ fromPlayerId: "P1", toPlayerId: "P2", resource: "water", amount: 5 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const resolveRes = await fetch(`${baseUrl}/v1/round/resolve-and-narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  assert.equal(resolveRes.status, 200);
+
+  const badgeRes = await fetch(`${baseUrl}/v1/match/${matchId}/badge`);
+  const badgeData = await badgeRes.json();
+
+  assert.equal(badgeRes.status, 200);
+  assert.equal(badgeData.matchId, matchId);
+  assert.equal(typeof badgeData.title, "string");
+  assert.equal(typeof badgeData.level, "string");
+  assert.ok(typeof badgeData.stats.cooperationCount === "number");
+});

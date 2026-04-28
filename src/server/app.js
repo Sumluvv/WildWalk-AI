@@ -2,6 +2,7 @@ import http from "node:http";
 import { resolveRound } from "../engine/roundEngine.js";
 import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
+import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
 
 function json(res, statusCode, payload) {
@@ -97,6 +98,17 @@ export function createAppServer() {
         diary: buildMatchDiary(matchId, logs),
         rounds: logs.length
       });
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/v1/match/") && req.url.endsWith("/badge")) {
+      const prefix = "/v1/match/";
+      const suffix = "/badge";
+      const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+      if (!matchId) {
+        return json(res, 400, { error: "BAD_REQUEST", message: "matchId is required" });
+      }
+      const logs = getMatchLogs(matchId);
+      return json(res, 200, buildMatchBadge(matchId, logs));
     }
 
     if (req.method === "POST" && req.url === "/v1/narration/preview") {
