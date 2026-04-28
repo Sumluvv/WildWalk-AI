@@ -182,3 +182,32 @@ test("betrayalActions are returned with trust matrix updates", async (t) => {
   assert.ok(Array.isArray(data.trustChanges));
   assert.ok(data.trustChanges.length >= 1);
 });
+
+test("eventDisclosures returns disclosure results and team intel", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    seed: 77,
+    round: 3,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    eventDisclosures: [{ playerId: "P1", disclose: true }],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/round/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(data.disclosureResults));
+  assert.ok(Array.isArray(data.teamIntel));
+});

@@ -277,3 +277,25 @@ test("trust evolves automatically after transfer and betrayal", () => {
   assert.ok(Array.isArray(result.trustChanges));
   assert.ok(result.trustChanges.length >= 2);
 });
+
+test("eventDisclosures can publish private event into teamIntel", () => {
+  const result = resolveRound({
+    seed: 700,
+    round: 8,
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    eventDisclosures: [{ playerId: "P1", disclose: true }],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  assert.ok(Array.isArray(result.disclosureResults));
+  const record = result.disclosureResults.find((x) => x.playerId === "P1");
+  assert.ok(record);
+  assert.ok(["applied_disclosed", "skipped_no_private_event"].includes(record.status));
+  if (record.status === "applied_disclosed") {
+    assert.ok(Array.isArray(result.teamIntel));
+  }
+});

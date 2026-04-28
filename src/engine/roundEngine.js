@@ -280,6 +280,58 @@ function evolveTrustFromRound({ trustMap, transferResults = [], betrayalResults 
   return changes;
 }
 
+function applyEventDisclosures(events = [], disclosures = [], players = []) {
+  if (!Array.isArray(events) || events.length === 0) {
+    return { events, disclosureResults: [], teamIntel: [] };
+  }
+  if (!Array.isArray(disclosures) || disclosures.length === 0) {
+    return { events, disclosureResults: [], teamIntel: [] };
+  }
+
+  const privateByTarget = new Map();
+  for (const event of events) {
+    if (event?.visibility !== "private") continue;
+    if (!event?.targetPlayerId) continue;
+    if (!privateByTarget.has(event.targetPlayerId)) privateByTarget.set(event.targetPlayerId, []);
+    privateByTarget.get(event.targetPlayerId).push(event);
+  }
+
+  const playerIds = new Set(players.map((p) => p.id));
+  const disclosureResults = [];
+  const teamIntel = [];
+
+  for (const d of disclosures) {
+    const playerId = d?.playerId;
+    const disclose = Boolean(d?.disclose);
+    if (!playerId || !playerIds.has(playerId)) {
+      disclosureResults.push({ ...d, status: "rejected_invalid_player" });
+      continue;
+    }
+    const owned = privateByTarget.get(playerId) || [];
+    if (owned.length === 0) {
+      disclosureResults.push({ ...d, status: "skipped_no_private_event", sharedCount: 0 });
+      continue;
+    }
+
+    if (disclose) {
+      for (const e of owned) {
+        teamIntel.push({
+          sourcePlayerId: playerId,
+          eventId: e.id,
+          title: e.title,
+          effect: e.effect,
+          fromPrivateEvent: true
+        });
+      }
+      disclosureResults.push({ ...d, status: "applied_disclosed", sharedCount: owned.length });
+    } else {
+      disclosureResults.push({ ...d, status: "applied_hidden", sharedCount: 0 });
+    }
+  }
+
+  return { events, disclosureResults, teamIntel };
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -290,11 +342,13 @@ export function resolveRound(input) {
   const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
   const transfers = Array.isArray(input?.transfers) ? input.transfers : [];
   const betrayalActions = Array.isArray(input?.betrayalActions) ? input.betrayalActions : [];
+  const eventDisclosures = Array.isArray(input?.eventDisclosures) ? input.eventDisclosures : [];
   const trustMatrix = Array.isArray(input?.trustMatrix) ? input.trustMatrix : [];
   const viewerPlayerId = input?.viewerPlayerId;
   const action = input?.action;
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
   const events = generateRoundEvents({ seed, round, players });
+  const disclosure = applyEventDisclosures(events, eventDisclosures, players);
   const visibleEvents = filterVisibleEvents(events, viewerPlayerId);
 
   if (playerActions.length > 0) {
@@ -334,8 +388,10 @@ export function resolveRound(input) {
     }
 
     return {
-      events,
+      events: disclosure.events,
       visibleEvents,
+      disclosureResults: disclosure.disclosureResults,
+      teamIntel: disclosure.teamIntel,
       trustMatrix: trustMatrixFromMap(trustMap),
       trustChanges,
       transferResults,
@@ -349,7 +405,7 @@ export function resolveRound(input) {
     numericDelta: one.numericDelta,
     action: one.action,
     nextState: one.nextState,
-    events,
+    events: disclosure.events,
     visibleEvents
   };
 }
