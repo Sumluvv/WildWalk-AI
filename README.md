@@ -167,6 +167,8 @@
   - 用途：一键执行 MVP 端到端演示流程（建房->加入->开局->一回合->结束->总结）
   - 请求体：`{ scenarioId?, finishReason? }`
   - 返回：`{ matchId, scenario, roundResult, narration, finalMatch, summary }`
+- `GET /demo`
+  - 用途：打开本地可点击演示页（浏览器中一键触发 `demo/run-once`）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -229,6 +231,7 @@
 - 新增 `resolve-turn` 房间回合接口，减少前端拼装回合上下文的负担。
 - 新增 `finish` 对局结束接口，覆盖登顶成功/全灭/救援中止。
 - 新增 `demo/run-once` 一键试玩接口，用于快速演示整条玩法链路。
+- 新增 `GET /demo` 演示页面，非技术同学可直接点击体验接口链路。
 
 ### 已知风险与待改进
 

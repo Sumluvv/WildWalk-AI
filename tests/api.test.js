@@ -20,6 +20,17 @@ test("GET /healthz returns ok", async (t) => {
   assert.equal(data.ok, true);
 });
 
+test("GET /demo returns html page", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/demo`);
+  const text = await res.text();
+
+  assert.equal(res.status, 200);
+  assert.ok(text.includes("WildWalk AI 一键试玩页"));
+});
+
 test("GET /v1/scenarios returns built-in scenario list", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());

@@ -3,6 +3,7 @@ import { resolveRound } from "../engine/roundEngine.js";
 import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
+import { renderDemoPage } from "./demoPage.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
 import {
   createMatch,
@@ -20,6 +21,11 @@ function json(res, statusCode, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function html(res, statusCode, content) {
+  res.writeHead(statusCode, { "Content-Type": "text/html; charset=utf-8" });
+  res.end(content);
+}
+
 async function readJsonBody(req) {
   let raw = "";
   for await (const chunk of req) raw += chunk;
@@ -35,6 +41,10 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/healthz") {
       return json(res, 200, { ok: true, service: "wildwalk-ai-backend" });
+    }
+
+    if (req.method === "GET" && req.url === "/demo") {
+      return html(res, 200, renderDemoPage());
     }
 
     if (req.method === "GET" && req.url === "/v1/scenarios") {
