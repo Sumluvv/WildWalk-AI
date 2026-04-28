@@ -5,6 +5,7 @@ import {
   STAT_MIN,
   WEATHER_COEFFICIENTS
 } from "./coefficients.js";
+import { generateRoundEvents } from "./events.js";
 
 function clamp(value, min = STAT_MIN, max = STAT_MAX) {
   return Math.max(min, Math.min(max, value));
@@ -22,6 +23,9 @@ export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
   const slope = input?.environment?.slope || "flat";
+  const seed = Number(input?.seed || 1);
+  const round = Number(input?.round || 1);
+  const players = Array.isArray(input?.players) ? input.players : [];
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
 
   let staminaLoss = 1.2 * weatherMul.staminaMul * slopeMul.staminaMul;
@@ -50,6 +54,7 @@ export function resolveRound(input) {
   const stress = clamp(state.stress + stressGain);
 
   const nextState = { stamina, water, hunger, cold, stress };
+  const events = generateRoundEvents({ seed, round, players });
   return {
     numericDelta: {
       stamina: Number((nextState.stamina - state.stamina).toFixed(2)),
@@ -58,6 +63,7 @@ export function resolveRound(input) {
       cold: Number((nextState.cold - state.cold).toFixed(2)),
       stress: Number((nextState.stress - state.stress).toFixed(2))
     },
-    nextState
+    nextState,
+    events
   };
 }

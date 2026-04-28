@@ -25,6 +25,9 @@ test("POST /v1/round/resolve returns numericDelta and nextState", async (t) => {
   t.after(() => server.close());
 
   const payload = {
+    seed: 11,
+    round: 1,
+    players: [{ id: "A" }, { id: "B" }],
     state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
     environment: { weather: "cloudy", slope: "flat" }
   };
@@ -39,6 +42,7 @@ test("POST /v1/round/resolve returns numericDelta and nextState", async (t) => {
   assert.equal(res.status, 200);
   assert.ok(data.numericDelta);
   assert.ok(data.nextState);
+  assert.ok(Array.isArray(data.events));
   assert.equal(typeof data.nextState.stamina, "number");
 });
 

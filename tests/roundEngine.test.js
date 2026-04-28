@@ -55,3 +55,30 @@ test("low cold (<30) adds at least 0.7 extra stress gain", () => {
 
   assert.ok(lowCold.numericDelta.stress - normalCold.numericDelta.stress >= 0.7);
 });
+
+test("same seed and round produce deterministic events", () => {
+  const input = {
+    seed: 12345,
+    round: 7,
+    players: [{ id: "A" }, { id: "B" }],
+    state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+  const first = resolveRound(input);
+  const second = resolveRound(input);
+  assert.deepEqual(first.events, second.events);
+});
+
+test("private events target a valid player", () => {
+  const result = resolveRound({
+    seed: 42,
+    round: 3,
+    players: [{ id: "P1" }, { id: "P2" }],
+    state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+  const privateEvents = result.events.filter((e) => e.visibility === "private");
+  for (const e of privateEvents) {
+    assert.ok(["P1", "P2"].includes(e.targetPlayerId));
+  }
+});

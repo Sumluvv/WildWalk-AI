@@ -71,6 +71,8 @@
 - `playerActions[]`: 玩家本回合提交的行动
 - `chatLogs[]`: 公聊与私聊文本
 - `seed`: 随机种子（保证可回放）
+- `round`: 当前回合编号
+- `players[]`: 玩家列表（用于私有事件定向分发）
 
 ### 回合输出（RoundResult）
 
@@ -86,8 +88,8 @@
   - 返回：`{ ok: true, service: "wildwalk-ai-backend" }`
 - `POST /v1/round/resolve`
   - 用途：执行单回合数值结算
-  - 请求体：`RoundInput`（当前最小实现使用 `state + environment`）
-  - 返回：`{ numericDelta, nextState }`
+  - 请求体：`RoundInput`（当前最小实现使用 `state + environment + seed + round + players`）
+  - 返回：`{ numericDelta, nextState, events }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -126,6 +128,7 @@
 - 完成多 Agent 首轮产出沉淀（数值策划、AI 叙事、移动端 UI 流程）。
 - 新增后端单回合规则引擎与基础测试，确保“可运行 + 可验证”。
 - 新增最小 HTTP API（健康检查 + 回合结算）与接口集成测试。
+- 新增 `seed` 可回放随机事件与公开/私有事件分发逻辑。
 
 ### 已知风险与待改进
 
@@ -139,6 +142,7 @@
 - ✅ 开发规则可执行
 - ✅ 已有代码级自动化测试（规则引擎 4 条断言）
 - ✅ 已有接口级测试（健康检查、回合结算、错误请求）
+- ✅ 已验证同 `seed + round` 的事件结果可复现
 
 ### 下一步建议（优先级）
 
