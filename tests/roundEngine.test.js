@@ -299,3 +299,22 @@ test("eventDisclosures can publish private event into teamIntel", () => {
     assert.ok(Array.isArray(result.teamIntel));
   }
 });
+
+test("disclosure consequences adjust stress and trust", () => {
+  const result = resolveRound({
+    seed: 901,
+    round: 9,
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    eventDisclosures: [{ playerId: "P1", disclose: false }],
+    trustMatrix: [{ fromPlayerId: "P2", toPlayerId: "P1", value: 50 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  const trust = result.trustMatrix.find((x) => x.fromPlayerId === "P2" && x.toPlayerId === "P1");
+  assert.ok(trust.value <= 50);
+  assert.ok(Array.isArray(result.disclosureConsequences));
+});

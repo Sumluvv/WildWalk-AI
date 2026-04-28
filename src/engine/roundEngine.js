@@ -332,6 +332,67 @@ function applyEventDisclosures(events = [], disclosures = [], players = []) {
   return { events, disclosureResults, teamIntel };
 }
 
+function applyDisclosureConsequences({
+  perPlayerResults,
+  disclosureResults = [],
+  teamIntel = [],
+  trustMap
+}) {
+  if (!Array.isArray(perPlayerResults) || perPlayerResults.length === 0) return [];
+  const byId = new Map(perPlayerResults.map((p) => [p.playerId, p]));
+  const allPlayerIds = perPlayerResults.map((p) => p.playerId);
+  const consequences = [];
+
+  for (const d of disclosureResults) {
+    const actorId = d?.playerId;
+    if (!actorId || !byId.has(actorId)) continue;
+    const actor = byId.get(actorId);
+
+    if (d.status === "applied_disclosed") {
+      // Open sharing calms team slightly and improves trust towards actor.
+      for (const otherId of allPlayerIds) {
+        if (otherId === actorId) continue;
+        const other = byId.get(otherId);
+        other.nextState.stress = clamp(other.nextState.stress - 1);
+        other.numericDelta = recalculateDelta(other.baseState, other.nextState);
+        adjustTrustDelta(trustMap, otherId, actorId, 1);
+        consequences.push({
+          playerId: otherId,
+          sourcePlayerId: actorId,
+          type: "disclosure_shared",
+          stressDelta: -1,
+          trustDelta: +1
+        });
+      }
+    } else if (d.status === "applied_hidden") {
+      // Hiding known private intel increases suspicion.
+      actor.nextState.stress = clamp(actor.nextState.stress + 1);
+      actor.numericDelta = recalculateDelta(actor.baseState, actor.nextState);
+      for (const otherId of allPlayerIds) {
+        if (otherId === actorId) continue;
+        adjustTrustDelta(trustMap, otherId, actorId, -1);
+      }
+      consequences.push({
+        playerId: actorId,
+        sourcePlayerId: actorId,
+        type: "disclosure_hidden",
+        stressDelta: +1,
+        trustDelta: -1
+      });
+    }
+  }
+
+  // Keep explicit signal when something was disclosed.
+  if (teamIntel.length > 0) {
+    consequences.push({
+      type: "team_intel_updated",
+      sharedEventCount: teamIntel.length
+    });
+  }
+
+  return consequences;
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -382,6 +443,12 @@ export function resolveRound(input) {
       transferResults,
       betrayalResults
     });
+    const disclosureConsequences = applyDisclosureConsequences({
+      perPlayerResults,
+      disclosureResults: disclosure.disclosureResults,
+      teamIntel: disclosure.teamIntel,
+      trustMap
+    });
 
     for (const player of perPlayerResults) {
       delete player.baseState;
@@ -394,6 +461,7 @@ export function resolveRound(input) {
       teamIntel: disclosure.teamIntel,
       trustMatrix: trustMatrixFromMap(trustMap),
       trustChanges,
+      disclosureConsequences,
       transferResults,
       betrayalResults,
       perPlayerResults

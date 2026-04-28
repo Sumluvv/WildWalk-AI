@@ -114,6 +114,7 @@
     - `trustChanges[]`（本回合自动关系演化明细）
     - `disclosureResults[]`（玩家是否公开私有事件的处理结果）
     - `teamIntel[]`（被公开到团队情报流的事件）
+    - `disclosureConsequences[]`（公开/隐瞒造成的信任与压力连带影响）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -161,6 +162,7 @@
 - 新增背刺动作规则（`betrayalActions[]`）并联动信任值与目标心理压力。
 - 新增关系演化：分享与背刺会自动产生 `trustChanges[]` 并更新 `trustMatrix`。
 - 新增私有事件公开决策链路（`eventDisclosures[] -> teamIntel[]`）。
+- 新增公开/隐瞒后的二次影响（队友压力与信任联动变化）。
 
 ### 已知风险与待改进
 

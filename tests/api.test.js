@@ -210,4 +210,5 @@ test("eventDisclosures returns disclosure results and team intel", async (t) => 
   assert.equal(res.status, 200);
   assert.ok(Array.isArray(data.disclosureResults));
   assert.ok(Array.isArray(data.teamIntel));
+  assert.ok(Array.isArray(data.disclosureConsequences));
 });
