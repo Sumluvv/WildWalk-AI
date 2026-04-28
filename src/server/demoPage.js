@@ -473,10 +473,10 @@ export function renderDemoPage() {
       if (!summary) return;
       const badge = summary.badge || {};
       els.summaryView.textContent =
-        "结局：" + reason + "\n\n" +
-        "航迹勋章：" + (badge.title || "未知") + "（" + (badge.level || "-") + "）\n" +
-        "关键统计：" + JSON.stringify(badge.stats || {}, null, 2) + "\n\n" +
-        "徒步日记：\n" + (summary.diary || "暂无");
+        "结局：" + reason + "\\n\\n" +
+        "航迹勋章：" + (badge.title || "未知") + "（" + (badge.level || "-") + "）\\n" +
+        "关键统计：" + JSON.stringify(badge.stats || {}, null, 2) + "\\n\\n" +
+        "徒步日记：\\n" + (summary.diary || "暂无");
     }
 
     function getOrCreateInventoryItem(player, itemId, fallbackName, consumable = true) {
@@ -686,7 +686,7 @@ export function renderDemoPage() {
       }
       els.narration.textContent = data.narration || "无旁白";
       els.judgeView.textContent = Array.isArray(data.aiAdjudication) && data.aiAdjudication.length
-        ? data.aiAdjudication.join("\n")
+        ? data.aiAdjudication.join("\\n")
         : "本回合无额外判定明细。";
       renderPlayers();
       renderMeta(data);
@@ -809,7 +809,7 @@ export function renderDemoPage() {
         setStatus(els.turnStatus, "自动完成 1 回合结算。", "good");
         setStatus(els.summaryStatus, "自动结束: " + data.finalMatch.finishReason + " | 勋章: " + data.summary.badge.title + " (" + data.summary.badge.level + ")", "good");
         els.narration.textContent = data.narration || "无旁白";
-        els.judgeView.textContent = Array.isArray(data.roundResult?.aiAdjudication) ? data.roundResult.aiAdjudication.join("\n") : "自动试玩未返回判定明细";
+        els.judgeView.textContent = Array.isArray(data.roundResult?.aiAdjudication) ? data.roundResult.aiAdjudication.join("\\n") : "自动试玩未返回判定明细";
         renderSummary(data.summary, data.finalMatch.finishReason);
         renderMeta(data.roundResult || {});
         renderPlayers();
