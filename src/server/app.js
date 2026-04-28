@@ -4,6 +4,7 @@ import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
+import { SCENARIOS } from "../data/scenarios.js";
 
 function json(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
@@ -25,6 +26,13 @@ export function createAppServer() {
   return http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/healthz") {
       return json(res, 200, { ok: true, service: "wildwalk-ai-backend" });
+    }
+
+    if (req.method === "GET" && req.url === "/v1/scenarios") {
+      return json(res, 200, {
+        total: SCENARIOS.length,
+        scenarios: SCENARIOS
+      });
     }
 
     if (req.method === "POST" && req.url === "/v1/round/resolve") {

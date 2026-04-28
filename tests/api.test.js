@@ -20,6 +20,19 @@ test("GET /healthz returns ok", async (t) => {
   assert.equal(data.ok, true);
 });
 
+test("GET /v1/scenarios returns built-in scenario list", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/scenarios`);
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(data.scenarios));
+  assert.ok(data.total >= 3);
+  assert.ok(data.scenarios.some((s) => s.id === "kyoto-daimonji"));
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());
