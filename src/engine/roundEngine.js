@@ -397,6 +397,7 @@ function buildNarrativePacket({
   round,
   environment,
   events,
+  chatLogs = [],
   teamIntel = [],
   trustChanges = [],
   disclosureConsequences = [],
@@ -416,10 +417,13 @@ function buildNarrativePacket({
       appliedTransfers: transferResults.filter((x) => x.status === "applied").length,
       appliedBetrayals: betrayalResults.filter((x) => x.status === "applied").length,
       trustChangeCount: trustChanges.length,
-      disclosureConsequenceCount: disclosureConsequences.length
+      disclosureConsequenceCount: disclosureConsequences.length,
+      publicChatCount: chatLogs.filter((c) => c.scope === "public").length,
+      privateChatCount: chatLogs.filter((c) => c.scope === "private").length
     },
     highlights: {
       events,
+      chatLogs,
       teamIntel,
       trustChanges,
       disclosureConsequences,
@@ -443,6 +447,7 @@ export function resolveRound(input) {
   const trustMatrix = Array.isArray(input?.trustMatrix) ? input.trustMatrix : [];
   const viewerPlayerId = input?.viewerPlayerId;
   const action = input?.action;
+  const chatLogs = Array.isArray(input?.chatLogs) ? input.chatLogs : [];
   const environment = { weather, slope };
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
   const events = generateRoundEvents({ seed, round, players });
@@ -506,6 +511,7 @@ export function resolveRound(input) {
         round,
         environment,
         events: disclosure.events,
+        chatLogs,
         teamIntel: disclosure.teamIntel,
         trustChanges,
         disclosureConsequences,
@@ -525,7 +531,8 @@ export function resolveRound(input) {
     narrativePacket: buildNarrativePacket({
       round,
       environment,
-      events: disclosure.events
+      events: disclosure.events,
+      chatLogs
     })
   };
 }

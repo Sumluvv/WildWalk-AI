@@ -489,7 +489,267 @@ test("POST /v1/round/resolve-and-narrate returns round result and narration", as
   assert.equal(res.status, 200);
   assert.ok(data.narrativePacket);
   assert.equal(typeof data.narration, "string");
-  assert.equal(data.narrationSource, "template-preview");
+  assert.ok(["template-fallback", "real-ai"].includes(data.narrationSource));
+});
+
+test("POST /v1/ai/narrate returns narration with fallback", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/ai/narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      narrativePacket: {
+        round: 2,
+        environment: { weather: "cloudy", slope: "flat" },
+        summary: { publicEventCount: 1, privateEventCount: 0, sharedIntelCount: 0, appliedTransfers: 0, appliedBetrayals: 0, trustChangeCount: 0 }
+      }
+    })
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(typeof data.narration, "string");
+  assert.ok(["template-fallback", "real-ai"].includes(data.source));
+});
+
+test("chat public/private endpoints support visibility filtering", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+  assert.equal(createRes.status, 200);
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+
+  const publicRes = await fetch(`${baseUrl}/v1/matches/${matchId}/chat/public`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", message: "我体力快见底了" })
+  });
+  assert.equal(publicRes.status, 200);
+
+  const privateRes = await fetch(`${baseUrl}/v1/matches/${matchId}/chat/private`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fromPlayerId: "P1", toPlayerId: "P2", message: "先别公开补给位置" })
+  });
+  assert.equal(privateRes.status, 200);
+
+  const p2Res = await fetch(`${baseUrl}/v1/matches/${matchId}/chat?viewerPlayerId=P2`);
+  const p2Data = await p2Res.json();
+  assert.equal(p2Res.status, 200);
+  assert.equal(p2Data.chats.length, 2);
+
+  const p3Res = await fetch(`${baseUrl}/v1/matches/${matchId}/chat?viewerPlayerId=P3`);
+  const p3Data = await p3Res.json();
+  assert.equal(p3Res.status, 200);
+  assert.equal(p3Data.chats.length, 1);
+  assert.equal(p3Data.chats[0].scope, "public");
+});
+
+test("resolve-turn injects chat logs into narrative packet", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+  assert.equal(createRes.status, 200);
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/start`, { method: "POST" });
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/chat/public`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", message: "跟紧我，不要掉队" })
+  });
+
+  const resolveRes = await fetch(`${baseUrl}/v1/matches/${matchId}/resolve-turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      viewerPlayerId: "P1",
+      playerActions: [
+        { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+        { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+      ],
+      environment: { weather: "cloudy", slope: "flat" }
+    })
+  });
+  const resolved = await resolveRes.json();
+
+  assert.equal(resolveRes.status, 200);
+  assert.ok(resolved.narrativePacket);
+  assert.ok(Array.isArray(resolved.narrativePacket.highlights.chatLogs));
+  assert.ok(resolved.narrativePacket.highlights.chatLogs.length >= 1);
+});
+
+test("resolve-turn injects bounded recent chat context", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/start`, { method: "POST" });
+
+  for (let i = 0; i < 20; i += 1) {
+    await fetch(`${baseUrl}/v1/matches/${matchId}/chat/public`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ playerId: "P1", message: `msg-${i}` })
+    });
+  }
+
+  const resolveRes = await fetch(`${baseUrl}/v1/matches/${matchId}/resolve-turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      viewerPlayerId: "P1",
+      playerActions: [
+        { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+        { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+      ],
+      environment: { weather: "cloudy", slope: "flat" }
+    })
+  });
+  const resolved = await resolveRes.json();
+  const injected = resolved?.narrativePacket?.highlights?.chatLogs || [];
+
+  assert.equal(resolveRes.status, 200);
+  assert.ok(injected.length <= 12);
+  assert.equal(injected[injected.length - 1]?.message, "msg-19");
+});
+
+test("GET /v1/matches/:id/sync returns incremental chats and logs", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/start`, { method: "POST" });
+
+  const since = new Date(Date.now() - 1000).toISOString();
+  await fetch(`${baseUrl}/v1/matches/${matchId}/chat/public`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", message: "sync-msg" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/resolve-turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      viewerPlayerId: "P1",
+      playerActions: [
+        { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+        { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+      ],
+      environment: { weather: "cloudy", slope: "flat" }
+    })
+  });
+
+  const syncRes = await fetch(
+    `${baseUrl}/v1/matches/${matchId}/sync?viewerPlayerId=P1&since=${encodeURIComponent(since)}`
+  );
+  const syncData = await syncRes.json();
+
+  assert.equal(syncRes.status, 200);
+  assert.ok(Array.isArray(syncData.chats));
+  assert.ok(Array.isArray(syncData.logs));
+  assert.ok(syncData.chats.some((x) => x.message === "sync-msg"));
+  assert.ok(syncData.logs.length >= 1);
 });
 
 test("GET /v1/match/:id/logs returns logs after resolve-and-narrate", async (t) => {

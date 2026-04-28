@@ -8,6 +8,10 @@
     "test": "node --test",
     "start": "node src/server/index.js"
   },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0",
+    "ws": "^8.18.3"
+  },
   "engines": {
     "node": ">=20"
   }

@@ -43,6 +43,9 @@
 - `docs/numeric-design-v0.md`：数值模型与参数 v0
 - `docs/ai-narrative-spec-v0.md`：AI 叙事与安全规范 v0
 - `docs/mobile-ui-mvp-flow.md`：移动端 MVP 页面流程
+- `docs/deploy-minimal.md`：最小云服务器部署步骤（可上线试玩）
+- `docs/nginx-wildwalk.conf`：Nginx 反向代理示例（含 WebSocket）
+- `docs/api-integration-guide.md`：服务器部署 / 数据库设置 / API 接入实操指南
 
 ## 3. 安装与运行说明（规划阶段）
 
@@ -91,7 +94,8 @@
 
 - `GET /healthz`
   - 用途：健康检查
-  - 返回：`{ ok: true, service: "wildwalk-ai-backend" }`
+  - 返回：`{ ok, service, db }`
+  - 说明：`db.ok=false` 时返回 `503`，便于部署平台探针快速熔断
 - `POST /v1/round/resolve`
   - 用途：执行单回合数值结算
   - 请求体：`RoundInput`（支持单人 `action` 和多人 `playerActions[]` 两种模式）
@@ -121,10 +125,15 @@
   - 请求体：`{ narrativePacket }`
   - 返回：`{ narration, source }`
 - `POST /v1/round/resolve-and-narrate`
-  - 用途：一次请求完成“回合结算 + 旁白预览”
+  - 用途：一次请求完成“回合结算 + AI 旁白”
   - 请求体：与 `POST /v1/round/resolve` 相同
-  - 返回：`roundResult + narration + narrationSource`
+  - 返回：`roundResult + narration + narrationSource + narrationModel`
   - 可选：传入 `matchId` 时，自动写入对局剧情日志
+  - 说明：若未配置真实 LLM，则自动模板回退（`template-fallback`）
+- `POST /v1/ai/narrate`
+  - 用途：只做旁白生成（真实 AI + 模板回退）
+  - 请求体：`{ narrativePacket }`
+  - 返回：`{ narration, source, model }`
 - `GET /v1/match/:matchId/logs`
   - 用途：读取指定对局的回合剧情日志（MVP 内存版）
   - 返回：`{ matchId, logs[] }`
@@ -158,7 +167,25 @@
 - `POST /v1/matches/:matchId/resolve-turn`
   - 用途：按房间当前回合自动结算并推进回合号
   - 请求体：回合输入（如 `playerActions/environment/viewerPlayerId`）
-  - 返回：`{ match, roundResult..., narration, narrationSource }`
+  - 返回：`{ match, roundResult..., narration, narrationSource, narrationModel }`
+  - 说明：会自动把该房间聊天记录注入回合上下文（`narrativePacket.highlights.chatLogs`）
+  - 注入策略（默认）：最近 2 回合、最多 12 条，避免历史聊天噪音污染旁白
+- `POST /v1/matches/:matchId/chat/public`
+  - 用途：发送公聊
+  - 请求体：`{ playerId, message }`
+  - 返回：聊天消息对象（`scope=public`）
+- `POST /v1/matches/:matchId/chat/private`
+  - 用途：发送私聊
+  - 请求体：`{ fromPlayerId, toPlayerId, message }`
+  - 返回：聊天消息对象（`scope=private`）
+- `GET /v1/matches/:matchId/chat?viewerPlayerId=...`
+  - 用途：按查看者读取可见聊天
+  - 返回：`{ matchId, viewerPlayerId, chats[] }`
+  - 说明：私聊仅双方可见，公聊全员可见
+- `GET /v1/matches/:matchId/sync?viewerPlayerId=...&since=...`
+  - 用途：断线重连后的增量补拉（聊天 + 回合日志）
+  - 返回：`{ matchId, since, serverTime, match, chats[], logs[] }`
+  - 说明：`since` 为 ISO 时间；不传则返回当前可见全量
 - `POST /v1/matches/:matchId/finish`
   - 用途：结束对局并写入结束原因
   - 请求体：`{ reason }`
@@ -170,6 +197,16 @@
 - `GET /demo`
   - 用途：打开本地可点击演示页（浏览器中一键触发 `demo/run-once`）
 
+### 实时推送（WebSocket）
+
+- 连接地址：`ws://localhost:3000/ws?matchId=<matchId>&playerId=<viewerPlayerId>`
+- 推送事件：
+  - `chat.public`：公聊消息广播
+  - `chat.private`：私聊消息定向推送（仅私聊双方收到）
+  - `turn.resolved`：回合结算广播（含 `narration` 与 `roundResult`）
+- 说明：`/demo` 页面已接入实时连接，聊天与回合结果可自动刷新
+- 稳定性：服务端已开启心跳保活（15s ping/pong），Demo 页断线后会自动重连
+
 ## 5. 测试与验证方法（MVP 目标）
 
 - 单元测试：数值计算规则（天气、坡度、负重、保暖）
@@ -180,6 +217,53 @@
 
 - 启动服务：`npm run start`
 - 运行测试：`npm test`
+- 一键冒烟自检：`./scripts/smoke.sh`
+  - 若开启鉴权：`ADMIN_API_KEY=你的值 ./scripts/smoke.sh`
+
+### 生产/试玩服部署（基础版）
+
+1. 复制环境模板：`cp .env.example .env`
+2. 按需修改 `.env`（至少确认 `PORT`、`DB_FILE`、`ENABLE_REAL_AI`）
+3. Docker 启动：`docker compose up -d --build`
+4. 健康检查：访问 `GET /healthz`
+5. 打开试玩页：`/demo`
+
+> 当前目标平台：**cross-platform（Docker Linux 容器）**。  
+> 若后续要 iOS-only/macOS-only 客户端联调，只需改客户端，不影响当前服务端部署方式。
+
+完整云部署步骤见：`docs/deploy-minimal.md`
+接口接入实操见：`docs/api-integration-guide.md`
+
+### PM2 启动（非 Docker 备用）
+
+1. 安装 PM2：`npm i -g pm2`
+2. 启动：`pm2 start ecosystem.config.cjs`
+3. 查看状态：`pm2 status`
+4. 开机自启：`pm2 startup && pm2 save`
+
+### Nginx 反向代理（含 WebSocket）
+
+- 示例文件：`docs/nginx-wildwalk.conf`
+- 核心点：
+  - `/` 反代 HTTP API 与 Demo
+  - `/ws` 反代 WebSocket，并开启 `Upgrade` 头
+
+### 真实 AI 旁白配置（可选）
+
+- `ENABLE_REAL_AI=true`：开启真实 LLM 调用
+- `LLM_API_KEY=<YOUR_API_KEY>`：LLM API Key（必须）
+- `LLM_BASE_URL=https://api.openai.com/v1`：兼容 OpenAI 协议的 Base URL（可选）
+- `LLM_MODEL=gpt-4o-mini`：模型名（可选）
+- `NARRATION_CHAT_MAX_MESSAGES=12`：回合旁白注入的聊天最大条数（可选）
+- `NARRATION_CHAT_ROUNDS_BACK=2`：回合旁白回看最近几回合聊天（可选）
+- `DB_FILE=.data/wildwalk.sqlite`：SQLite 数据库文件（推荐保留默认）
+- `RUNTIME_STORE_FILE=.data/runtime-store.json`：运行态持久化文件路径（可选）
+- `REQUIRE_ADMIN_KEY=false`：是否启用写接口鉴权（建议生产开）
+- `ADMIN_API_KEY=<YOUR_ADMIN_API_KEY>`：管理接口 Key（请求头 `x-admin-key`）
+- `RATE_LIMIT_ENABLED=true`：是否启用限流
+- `RATE_LIMIT_WINDOW_MS=60000`：限流时间窗口（毫秒）
+- `RATE_LIMIT_MAX_REQUESTS=240`：每个 IP 在窗口内最大请求数
+- 未配置或调用失败时会自动回退到模板旁白，保证试玩流程不中断
 
 ### 手动验收步骤（给非技术同学）
 
@@ -232,6 +316,25 @@
 - 新增 `finish` 对局结束接口，覆盖登顶成功/全灭/救援中止。
 - 新增 `demo/run-once` 一键试玩接口，用于快速演示整条玩法链路。
 - 新增 `GET /demo` 演示页面，非技术同学可直接点击体验接口链路。
+- 新增真实 AI 旁白服务（`POST /v1/ai/narrate`），支持模板回退，保证可用性。
+- 新增公聊/私聊接口与可见性过滤接口（`chat/public`、`chat/private`、`chat?viewerPlayerId`）。
+- 新增回合自动注入聊天上下文，AI 旁白可读取玩家聊天语境（`narrativePacket.highlights.chatLogs`）。
+- 升级聊天注入策略为“最近窗口注入”（默认最近 2 回合、最多 12 条），降低提示词噪音并稳定旁白质量。
+- 新增 WebSocket 实时推送能力（聊天/回合），`/demo` 页面支持自动实时刷新体验。
+- 升级私聊为服务端定向推送，并加入心跳与自动重连机制，提升弱网环境稳定性。
+- 新增运行态本地持久化（对局/聊天/日志）与重启恢复，支持断线后增量补拉 `sync` 接口。
+- 实装 SQLite 持久化底座，默认将运行态写入 `.data/wildwalk.sqlite`，提升重启恢复稳定性。
+- 持久化升级为 SQLite 结构化表（`matches`/`match_logs`/`match_chats`），查询与恢复更稳定。
+- 新增 `.env.example`、`Dockerfile`、`docker-compose.yml`，补齐基础部署链路（本地到试玩服）。
+- 新增请求级 `X-Request-Id` 与基础访问日志，便于线上问题排查。
+- 新增最小云服务器部署文档（`docs/deploy-minimal.md`），覆盖启动、验证与回滚步骤。
+- 新增 `healthz` 数据库可用性检查，便于平台健康探针与自动重启策略。
+- 新增 `ecosystem.config.cjs`，支持 PM2 一键拉起（非 Docker 备用方案）。
+- 新增 Nginx 配置示例（`docs/nginx-wildwalk.conf`），覆盖 WebSocket 转发。
+- 新增可开关的 Admin Key 鉴权与全局 IP 限流，提升试玩服抗滥用能力。
+- 新增 `scripts/smoke.sh`，支持上线前一键核心链路自检。
+- 新增 `docs/api-integration-guide.md`，详细说明服务器部署、数据库设置与 API 接入步骤。
+- 新增 `.dockerignore` 并补强 `.gitignore`，避免部署镜像误带运行数据。
 
 ### 已知风险与待改进
 

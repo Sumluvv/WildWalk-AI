@@ -21,6 +21,17 @@ export function createMatch({ scenarioId }) {
   return match;
 }
 
+export function listMatches() {
+  return Array.from(matches.values());
+}
+
+export function loadMatches(items = []) {
+  matches.clear();
+  for (const item of items) {
+    if (item?.matchId) matches.set(item.matchId, item);
+  }
+}
+
 export function getMatch(matchId) {
   return matches.get(matchId) || null;
 }
