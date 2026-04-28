@@ -274,3 +274,38 @@ test("POST /v1/round/resolve-and-narrate returns round result and narration", as
   assert.equal(typeof data.narration, "string");
   assert.equal(data.narrationSource, "template-preview");
 });
+
+test("GET /v1/match/:id/logs returns logs after resolve-and-narrate", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const matchId = "demo-match-1";
+  const payload = {
+    matchId,
+    seed: 1001,
+    round: 1,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+    ],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const resolveRes = await fetch(`${baseUrl}/v1/round/resolve-and-narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  assert.equal(resolveRes.status, 200);
+
+  const logsRes = await fetch(`${baseUrl}/v1/match/${matchId}/logs`);
+  const logsData = await logsRes.json();
+
+  assert.equal(logsRes.status, 200);
+  assert.equal(logsData.matchId, matchId);
+  assert.ok(Array.isArray(logsData.logs));
+  assert.ok(logsData.logs.length >= 1);
+  assert.equal(typeof logsData.logs[0].narration, "string");
+});

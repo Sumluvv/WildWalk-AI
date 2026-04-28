@@ -1,6 +1,7 @@
 import http from "node:http";
 import { resolveRound } from "../engine/roundEngine.js";
 import { renderNarrationPreview } from "../narration/templateNarration.js";
+import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
 
 function json(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
@@ -42,6 +43,20 @@ export function createAppServer() {
         const body = await readJsonBody(req);
         const roundResult = resolveRound(body);
         const narration = renderNarrationPreview(roundResult?.narrativePacket || {});
+        const matchId = body?.matchId;
+        if (matchId) {
+          appendMatchLog(matchId, {
+            round: body?.round ?? roundResult?.narrativePacket?.round ?? null,
+            narration,
+            narrativePacket: roundResult?.narrativePacket || null,
+            keyChanges: {
+              trustChanges: roundResult?.trustChanges || [],
+              disclosureConsequences: roundResult?.disclosureConsequences || [],
+              transferResults: roundResult?.transferResults || [],
+              betrayalResults: roundResult?.betrayalResults || []
+            }
+          });
+        }
         return json(res, 200, {
           ...roundResult,
           narration,
@@ -53,6 +68,19 @@ export function createAppServer() {
           message: error instanceof Error ? error.message : "Unknown request error"
         });
       }
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/v1/match/") && req.url.endsWith("/logs")) {
+      const prefix = "/v1/match/";
+      const suffix = "/logs";
+      const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+      if (!matchId) {
+        return json(res, 400, { error: "BAD_REQUEST", message: "matchId is required" });
+      }
+      return json(res, 200, {
+        matchId,
+        logs: getMatchLogs(matchId)
+      });
     }
 
     if (req.method === "POST" && req.url === "/v1/narration/preview") {
