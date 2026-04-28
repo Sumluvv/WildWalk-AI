@@ -309,3 +309,38 @@ test("GET /v1/match/:id/logs returns logs after resolve-and-narrate", async (t) 
   assert.ok(logsData.logs.length >= 1);
   assert.equal(typeof logsData.logs[0].narration, "string");
 });
+
+test("GET /v1/match/:id/diary returns generated diary text", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const matchId = "demo-match-2";
+  const payload = {
+    matchId,
+    seed: 1002,
+    round: 1,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+    ],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const resolveRes = await fetch(`${baseUrl}/v1/round/resolve-and-narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  assert.equal(resolveRes.status, 200);
+
+  const diaryRes = await fetch(`${baseUrl}/v1/match/${matchId}/diary`);
+  const diaryData = await diaryRes.json();
+
+  assert.equal(diaryRes.status, 200);
+  assert.equal(diaryData.matchId, matchId);
+  assert.equal(typeof diaryData.diary, "string");
+  assert.ok(diaryData.diary.includes("徒步日记"));
+  assert.ok(diaryData.diary.includes("第 1 回合"));
+});

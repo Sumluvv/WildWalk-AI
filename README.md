@@ -128,6 +128,9 @@
 - `GET /v1/match/:matchId/logs`
   - 用途：读取指定对局的回合剧情日志（MVP 内存版）
   - 返回：`{ matchId, logs[] }`
+- `GET /v1/match/:matchId/diary`
+  - 用途：基于日志生成“徒步日记”文本（MVP 模板版）
+  - 返回：`{ matchId, diary, rounds }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -180,6 +183,7 @@
 - 新增 `POST /v1/narration/preview` 旁白预览接口（模板渲染）。
 - 新增 `POST /v1/round/resolve-and-narrate` 一体化接口，便于前端单次调用。
 - 新增对局日志接口（内存版），用于“徒步日记”与“航迹勋章”后续能力衔接。
+- 新增 `GET /v1/match/:matchId/diary`，可直接产出中文日记预览。
 
 ### 已知风险与待改进
 
