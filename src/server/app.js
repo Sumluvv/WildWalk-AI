@@ -111,6 +111,23 @@ export function createAppServer() {
       return json(res, 200, buildMatchBadge(matchId, logs));
     }
 
+    if (req.method === "GET" && req.url.startsWith("/v1/match/") && req.url.endsWith("/summary")) {
+      const prefix = "/v1/match/";
+      const suffix = "/summary";
+      const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+      if (!matchId) {
+        return json(res, 400, { error: "BAD_REQUEST", message: "matchId is required" });
+      }
+      const logs = getMatchLogs(matchId);
+      return json(res, 200, {
+        matchId,
+        rounds: logs.length,
+        badge: buildMatchBadge(matchId, logs),
+        diary: buildMatchDiary(matchId, logs),
+        logs
+      });
+    }
+
     if (req.method === "POST" && req.url === "/v1/narration/preview") {
       try {
         const body = await readJsonBody(req);

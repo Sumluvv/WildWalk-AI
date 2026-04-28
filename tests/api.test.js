@@ -380,3 +380,40 @@ test("GET /v1/match/:id/badge returns badge summary", async (t) => {
   assert.equal(typeof badgeData.level, "string");
   assert.ok(typeof badgeData.stats.cooperationCount === "number");
 });
+
+test("GET /v1/match/:id/summary returns unified post-match payload", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const matchId = "demo-match-4";
+  const payload = {
+    matchId,
+    seed: 1004,
+    round: 1,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+    ],
+    transfers: [{ fromPlayerId: "P1", toPlayerId: "P2", resource: "water", amount: 5 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const resolveRes = await fetch(`${baseUrl}/v1/round/resolve-and-narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  assert.equal(resolveRes.status, 200);
+
+  const summaryRes = await fetch(`${baseUrl}/v1/match/${matchId}/summary`);
+  const summaryData = await summaryRes.json();
+
+  assert.equal(summaryRes.status, 200);
+  assert.equal(summaryData.matchId, matchId);
+  assert.equal(typeof summaryData.diary, "string");
+  assert.ok(summaryData.badge);
+  assert.ok(Array.isArray(summaryData.logs));
+  assert.ok(summaryData.logs.length >= 1);
+});

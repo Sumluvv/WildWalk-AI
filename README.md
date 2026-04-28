@@ -134,6 +134,9 @@
 - `GET /v1/match/:matchId/badge`
   - 用途：基于日志统计生成“航迹勋章”与称号（MVP 规则版）
   - 返回：`{ matchId, level, title, stats }`
+- `GET /v1/match/:matchId/summary`
+  - 用途：赛后总结一体化读取（日志+日记+勋章）
+  - 返回：`{ matchId, rounds, badge, diary, logs }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -188,6 +191,7 @@
 - 新增对局日志接口（内存版），用于“徒步日记”与“航迹勋章”后续能力衔接。
 - 新增 `GET /v1/match/:matchId/diary`，可直接产出中文日记预览。
 - 新增 `GET /v1/match/:matchId/badge`，可返回称号、等级与关键统计。
+- 新增 `GET /v1/match/:matchId/summary`，便于前端一接口渲染赛后页。
 
 ### 已知风险与待改进
 
