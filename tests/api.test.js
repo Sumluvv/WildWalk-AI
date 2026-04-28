@@ -212,6 +212,69 @@ test("POST /v1/matches/:id/resolve-turn resolves and advances round", async (t) 
   assert.equal(resolved.match.round, 2);
 });
 
+test("POST /v1/matches/:id/resolve-turn supports free-text intents and ai phase", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", nickname: "Alice" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/join`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", nickname: "Bob" })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P1", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/ready`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ playerId: "P2", ready: true })
+  });
+  await fetch(`${baseUrl}/v1/matches/${matchId}/start`, { method: "POST" });
+
+  const resolveRes = await fetch(`${baseUrl}/v1/matches/${matchId}/resolve-turn`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      viewerPlayerId: "P1",
+      playerActions: [
+        {
+          playerId: "P1",
+          intent: "我先前进，如果可以给P2 8水",
+          followupIntent: "再检查地图",
+          state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20, hasMap: true, hasShellJacket: true, deviceBattery: 95, signal: 70 }
+        },
+        {
+          playerId: "P2",
+          intent: "我先扎营休息，晚点跟上P1",
+          followupIntent: "我会检查相机和电量",
+          state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24, hasHeavyCamera: true, hasPowerBank: true, loadWeight: 20, deviceBattery: 90, signal: 60 }
+        }
+      ]
+    })
+  });
+  const resolved = await resolveRes.json();
+
+  assert.equal(resolveRes.status, 200);
+  assert.equal(typeof resolved.aiPhase?.broadcast, "string");
+  assert.ok(Array.isArray(resolved.transferResults));
+  assert.ok(resolved.perPlayerResults.every((x) => typeof x.nextState.deviceBattery === "number"));
+});
+
 test("POST /v1/matches/:id/finish marks match finished", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());

@@ -39,9 +39,12 @@ export const SCENARIO_DETAILS = {
       "遇到私有事件时建议公开，快速建立队友信任。"
     ],
     sampleWaypoints: [
-      { name: "银阁寺入口", altitude: 90, terrain: "flat" },
-      { name: "中段林道", altitude: 260, terrain: "rolling" },
-      { name: "大文字火床", altitude: 466, terrain: "rolling" }
+      { name: "银阁寺入口", altitude: 90, terrain: "石阶", slope: "flat", weather: "cloudy", temperatureC: 16, visibility: "良好" },
+      { name: "若王子神社分岔", altitude: 150, terrain: "林道", slope: "rolling", weather: "cloudy", temperatureC: 13, visibility: "一般" },
+      { name: "中段杉林补水点", altitude: 230, terrain: "湿滑泥土", slope: "rolling", weather: "harsh", temperatureC: 8, visibility: "受雨雾影响" },
+      { name: "风口观景台", altitude: 320, terrain: "碎石坡", slope: "steep", weather: "harsh", temperatureC: 4, visibility: "强风低能见" },
+      { name: "大文字火床前缘", altitude: 410, terrain: "裸岩", slope: "steep", weather: "cloudy", temperatureC: 6, visibility: "中等" },
+      { name: "大文字火床", altitude: 466, terrain: "山脊平台", slope: "rolling", weather: "clear", temperatureC: 7, visibility: "开阔" }
     ]
   },
   "yakushima-traverse": {
@@ -51,9 +54,12 @@ export const SCENARIO_DETAILS = {
       "团队中至少 1 人持续执行装备检查行动。"
     ],
     sampleWaypoints: [
-      { name: "淀川登山口", altitude: 1360, terrain: "rolling" },
-      { name: "花之江河", altitude: 1640, terrain: "rolling" },
-      { name: "宫之浦岳周边", altitude: 1936, terrain: "steep" }
+      { name: "淀川登山口", altitude: 1360, terrain: "苔藓木道", slope: "rolling", weather: "cloudy", temperatureC: 12, visibility: "潮湿雾气" },
+      { name: "高盘岳路段", altitude: 1520, terrain: "岩根坡", slope: "rolling", weather: "harsh", temperatureC: 9, visibility: "雨幕遮挡" },
+      { name: "花之江河", altitude: 1640, terrain: "泥泞草甸", slope: "flat", weather: "harsh", temperatureC: 7, visibility: "低" },
+      { name: "黑味岳分岔", altitude: 1760, terrain: "连续台阶", slope: "steep", weather: "harsh", temperatureC: 5, visibility: "低" },
+      { name: "宫之浦岳前脊", altitude: 1880, terrain: "裸露岩脊", slope: "steep", weather: "cloudy", temperatureC: 4, visibility: "中等" },
+      { name: "宫之浦岳周边", altitude: 1936, terrain: "山顶平台", slope: "rolling", weather: "clear", temperatureC: 3, visibility: "开阔" }
     ]
   },
   "everest-base-camp": {
@@ -63,9 +69,12 @@ export const SCENARIO_DETAILS = {
       "发现补给时优先共享，保持全队最低生存线。"
     ],
     sampleWaypoints: [
-      { name: "卢卡拉", altitude: 2860, terrain: "rolling" },
-      { name: "南池", altitude: 3440, terrain: "steep" },
-      { name: "珠峰大本营", altitude: 5364, terrain: "steep" }
+      { name: "卢卡拉", altitude: 2860, terrain: "石板路", slope: "rolling", weather: "cloudy", temperatureC: 5, visibility: "中等" },
+      { name: "南池", altitude: 3440, terrain: "山谷碎石", slope: "steep", weather: "harsh", temperatureC: -2, visibility: "风雪间歇" },
+      { name: "天波切", altitude: 3860, terrain: "风化土坡", slope: "steep", weather: "harsh", temperatureC: -6, visibility: "低" },
+      { name: "丁波切", altitude: 4410, terrain: "冻土路段", slope: "rolling", weather: "harsh", temperatureC: -10, visibility: "低" },
+      { name: "罗布切", altitude: 4910, terrain: "冰碛石海", slope: "steep", weather: "harsh", temperatureC: -14, visibility: "极低" },
+      { name: "珠峰大本营", altitude: 5364, terrain: "冰碛营地", slope: "rolling", weather: "cloudy", temperatureC: -18, visibility: "短时改善" }
     ]
   }
 };

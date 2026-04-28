@@ -7,6 +7,7 @@ import {
 } from "./coefficients.js";
 import { applyActionEffects } from "./actions.js";
 import { generateRoundEvents } from "./events.js";
+import { parseIntentAction, parseIntentDirectives } from "./freeTextIntent.js";
 import { filterVisibleEvents } from "./visibility.js";
 
 function clamp(value, min = STAT_MIN, max = STAT_MAX) {
@@ -21,22 +22,34 @@ function getMultipliers(weather, slope) {
   return { weatherMul, slopeMul };
 }
 
-function resolveSingleState({ state, action, weatherMul, slopeMul }) {
+function resolveSingleState({ state, action, secondaryAction, weatherMul, slopeMul }) {
+  const loadWeight = Number(state.loadWeight || 0);
+  const hasShellJacket = Boolean(state.hasShellJacket);
+  const hasHeavyCamera = Boolean(state.hasHeavyCamera);
+  const hasMap = Boolean(state.hasMap);
+  const hasPowerBank = Boolean(state.hasPowerBank);
+  const hasSatellitePhone = Boolean(state.hasSatellitePhone);
+
   let staminaLoss = 1.2 * weatherMul.staminaMul * slopeMul.staminaMul;
+  staminaLoss += loadWeight * 0.04;
+  if (hasHeavyCamera) staminaLoss += 0.6;
   if (state.water < 30) staminaLoss += 0.5;
   if (state.hunger < 30) staminaLoss += 0.5;
   if (state.cold < 30) staminaLoss += 0.8;
 
   let waterLoss = 1.0 * weatherMul.waterMul * slopeMul.waterMul;
+  waterLoss += loadWeight * 0.01;
   if (state.stamina < 20) waterLoss += 0.3;
 
   let hungerLoss = 0.7 * weatherMul.hungerMul * slopeMul.hungerMul;
   if (state.stamina < 30) hungerLoss += 0.2;
 
   let coldLoss = 0.8 * weatherMul.coldMul * slopeMul.coldMul;
+  if (hasShellJacket) coldLoss -= 0.6;
   if (state.water < 20) coldLoss += 0.6;
 
   let stressGain = 0.6 * weatherMul.stressMul * slopeMul.stressMul;
+  if (hasMap) stressGain -= 0.3;
   if (state.stamina < 30) stressGain += 0.6;
   if (state.water < 30) stressGain += 0.4;
   if (state.hunger < 30) stressGain += 0.3;
@@ -52,8 +65,28 @@ function resolveSingleState({ state, action, weatherMul, slopeMul }) {
     water: clamp(state.water - afterAction.waterLoss),
     hunger: clamp(state.hunger - afterAction.hungerLoss),
     cold: clamp(state.cold - afterAction.coldLoss),
-    stress: clamp(state.stress + afterAction.stressGain)
+    stress: clamp(state.stress + afterAction.stressGain),
+    deviceBattery: clamp((state.deviceBattery ?? 100) - (1.8 + (action === "move" ? 0.7 : 0.3) - (hasPowerBank ? 0.8 : 0))),
+    signal: clamp((state.signal ?? 65) + (hasSatellitePhone ? 4 : 0) - (weatherMul.stressMul > 1.1 ? 6 : 2))
   };
+
+  if (secondaryAction) {
+    if (secondaryAction === "move") {
+      nextState.stamina = clamp(nextState.stamina - 1.2);
+      nextState.water = clamp(nextState.water - 0.6);
+      nextState.stress = clamp(nextState.stress + 0.4);
+    } else if (secondaryAction === "camp") {
+      nextState.stamina = clamp(nextState.stamina + 1.0);
+      nextState.cold = clamp(nextState.cold + 1.2);
+      nextState.stress = clamp(nextState.stress - 0.5);
+    } else if (secondaryAction === "hydrate") {
+      nextState.water = clamp(nextState.water + 1.6);
+      nextState.stress = clamp(nextState.stress - 0.2);
+    } else if (secondaryAction === "check") {
+      nextState.signal = clamp(nextState.signal + 2);
+      nextState.deviceBattery = clamp(nextState.deviceBattery - 0.4);
+    }
+  }
 
   return {
     action: afterAction.action,
@@ -63,7 +96,9 @@ function resolveSingleState({ state, action, weatherMul, slopeMul }) {
       water: Number((nextState.water - state.water).toFixed(2)),
       hunger: Number((nextState.hunger - state.hunger).toFixed(2)),
       cold: Number((nextState.cold - state.cold).toFixed(2)),
-      stress: Number((nextState.stress - state.stress).toFixed(2))
+      stress: Number((nextState.stress - state.stress).toFixed(2)),
+      deviceBattery: Number((nextState.deviceBattery - (state.deviceBattery ?? 100)).toFixed(2)),
+      signal: Number((nextState.signal - (state.signal ?? 65)).toFixed(2))
     }
   };
 }
@@ -74,7 +109,9 @@ function recalculateDelta(baseState, nextState) {
     water: Number((nextState.water - baseState.water).toFixed(2)),
     hunger: Number((nextState.hunger - baseState.hunger).toFixed(2)),
     cold: Number((nextState.cold - baseState.cold).toFixed(2)),
-    stress: Number((nextState.stress - baseState.stress).toFixed(2))
+    stress: Number((nextState.stress - baseState.stress).toFixed(2)),
+    deviceBattery: Number((nextState.deviceBattery - (baseState.deviceBattery ?? 100)).toFixed(2)),
+    signal: Number((nextState.signal - (baseState.signal ?? 65)).toFixed(2))
   };
 }
 
@@ -419,7 +456,8 @@ function buildNarrativePacket({
       trustChangeCount: trustChanges.length,
       disclosureConsequenceCount: disclosureConsequences.length,
       publicChatCount: chatLogs.filter((c) => c.scope === "public").length,
-      privateChatCount: chatLogs.filter((c) => c.scope === "private").length
+      privateChatCount: chatLogs.filter((c) => c.scope === "private").length,
+      hallucinationRisk: events.some((e) => e.effect?.includes("hallucination")) || false
     },
     highlights: {
       events,
@@ -441,8 +479,8 @@ export function resolveRound(input) {
   const round = Number(input?.round || 1);
   const players = Array.isArray(input?.players) ? input.players : [];
   const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
-  const transfers = Array.isArray(input?.transfers) ? input.transfers : [];
-  const betrayalActions = Array.isArray(input?.betrayalActions) ? input.betrayalActions : [];
+  const transfers = Array.isArray(input?.transfers) ? [...input.transfers] : [];
+  const betrayalActions = Array.isArray(input?.betrayalActions) ? [...input.betrayalActions] : [];
   const eventDisclosures = Array.isArray(input?.eventDisclosures) ? input.eventDisclosures : [];
   const trustMatrix = Array.isArray(input?.trustMatrix) ? input.trustMatrix : [];
   const viewerPlayerId = input?.viewerPlayerId;
@@ -459,9 +497,19 @@ export function resolveRound(input) {
     const perPlayerResults = playerActions.map((entry) => {
       const playerId = entry?.playerId || "unknown";
       const playerState = { ...INITIAL_STATS, ...(entry?.state || {}) };
+      const primaryAction = parseIntentAction(entry?.action, entry?.intent);
+      const secondaryAction = parseIntentAction(entry?.followupAction, entry?.followupIntent, null);
+      const directives = parseIntentDirectives({
+        playerId,
+        intentText: entry?.intent,
+        followupIntent: entry?.followupIntent
+      });
+      transfers.push(...directives.transfers);
+      betrayalActions.push(...directives.betrayalActions);
       const one = resolveSingleState({
         state: playerState,
-        action: entry?.action,
+        action: primaryAction,
+        secondaryAction,
         weatherMul,
         slopeMul
       });
@@ -470,6 +518,8 @@ export function resolveRound(input) {
         playerId,
         baseState: playerState,
         ...one,
+        intent: entry?.intent || "",
+        followupIntent: entry?.followupIntent || "",
         visibleEvents: filterVisibleEvents(events, playerId)
       };
     });
@@ -521,7 +571,13 @@ export function resolveRound(input) {
     };
   }
 
-  const one = resolveSingleState({ state, action, weatherMul, slopeMul });
+  const one = resolveSingleState({
+    state,
+    action: parseIntentAction(action, input?.intent),
+    secondaryAction: parseIntentAction(input?.followupAction, input?.followupIntent, null),
+    weatherMul,
+    slopeMul
+  });
   return {
     numericDelta: one.numericDelta,
     action: one.action,

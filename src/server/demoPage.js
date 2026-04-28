@@ -79,21 +79,30 @@ export function renderDemoPage() {
       </section>
 
       <section class="card">
-        <h3>3) 每回合操作</h3>
+        <h3>3) 每回合操作（聊天输入高自由）</h3>
         <div class="row">
-          <label>P1 行动</label>
-          <select id="actionP1">
-            <option value="move">前进</option><option value="camp">扎营</option><option value="hydrate">补水</option><option value="check">检查装备</option>
-          </select>
+          <label>P1 第一行动（自由输入）</label>
+          <input id="intentP1" placeholder="例如：我先前进到风口，再找水，必要时给P2 10水" />
         </div>
         <div class="row">
-          <label>P2 行动</label>
-          <select id="actionP2">
-            <option value="camp">扎营</option><option value="move">前进</option><option value="hydrate">补水</option><option value="check">检查装备</option>
-          </select>
+          <label>P2 第一行动（自由输入）</label>
+          <input id="intentP2" placeholder="例如：我先扎营检查装备，观察前方路况" />
         </div>
-        <div class="row"><button class="primary" id="resolveBtn">结算 1 回合</button></div>
+        <div class="row">
+          <label>P1 第二行动（裁定后再执行）</label>
+          <input id="followupP1" placeholder="例如：我继续前进并公开刚发现的路标" />
+        </div>
+        <div class="row">
+          <label>P2 第二行动（裁定后再执行）</label>
+          <input id="followupP2" placeholder="例如：我跟随P1并分享巧克力给P1 8" />
+        </div>
+        <div class="row"><button class="primary" id="resolveBtn">AI 裁定并结算 1 回合</button></div>
         <div id="turnStatus" class="status">尚未开局</div>
+      </section>
+
+      <section class="card">
+        <h3>AI 环境播报（AI Phase）</h3>
+        <div id="aiPhaseView" class="narr">等待回合开始...</div>
       </section>
 
       <section class="card">
@@ -167,13 +176,16 @@ export function renderDemoPage() {
       startBtn: document.getElementById("startBtn"),
       resolveBtn: document.getElementById("resolveBtn"),
       finishBtn: document.getElementById("finishBtn"),
-      actionP1: document.getElementById("actionP1"),
-      actionP2: document.getElementById("actionP2"),
+      intentP1: document.getElementById("intentP1"),
+      intentP2: document.getElementById("intentP2"),
+      followupP1: document.getElementById("followupP1"),
+      followupP2: document.getElementById("followupP2"),
       finishReason: document.getElementById("finishReason"),
       matchStatus: document.getElementById("matchStatus"),
       lobbyStatus: document.getElementById("lobbyStatus"),
       turnStatus: document.getElementById("turnStatus"),
       summaryStatus: document.getElementById("summaryStatus"),
+      aiPhaseView: document.getElementById("aiPhaseView"),
       narration: document.getElementById("narration"),
       playersView: document.getElementById("playersView"),
       metaView: document.getElementById("metaView"),
@@ -197,8 +209,8 @@ export function renderDemoPage() {
       reconnectTimer: null,
       lastSyncAt: null,
       players: [
-        { id: "P1", nickname: "Alice", stats: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
-        { id: "P2", nickname: "Bob", stats: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+        { id: "P1", nickname: "Alice", role: "待分配", inventory: [], stats: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20, deviceBattery: 95, signal: 65 } },
+        { id: "P2", nickname: "Bob", role: "待分配", inventory: [], stats: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24, deviceBattery: 92, signal: 62 } }
       ],
       chats: []
     };
@@ -290,16 +302,50 @@ export function renderDemoPage() {
       "</div>";
     }
 
+    function pickRandom(list) {
+      return list[Math.floor(Math.random() * list.length)];
+    }
+
+    function randomLoadoutFor(playerId) {
+      const rolePool = [
+        {
+          role: "资深驴友",
+          inventory: ["GORE-TEX 冲锋衣", "卫星电话", "地图", "高热量能量棒"],
+          patch: { stamina: +8, cold: +10, stress: -4, loadWeight: 18, hasShellJacket: true, hasSatellitePhone: true, hasMap: true, hasPowerBank: false, hasHeavyCamera: false }
+        },
+        {
+          role: "小白游客",
+          inventory: ["普通卫衣", "半瓶矿泉水", "手机", "充电宝"],
+          patch: { stamina: -5, cold: -12, stress: +6, loadWeight: 8, hasShellJacket: false, hasSatellitePhone: false, hasMap: false, hasPowerBank: true, hasHeavyCamera: false }
+        },
+        {
+          role: "摄影爱好者",
+          inventory: ["单反相机", "长焦镜头", "三脚架", "备用电池"],
+          patch: { stamina: -3, cold: -2, stress: +2, loadWeight: 22, hasShellJacket: false, hasSatellitePhone: false, hasMap: true, hasPowerBank: true, hasHeavyCamera: true }
+        }
+      ];
+      const chosen = pickRandom(rolePool);
+      return {
+        playerId,
+        role: chosen.role,
+        inventory: chosen.inventory,
+        patch: chosen.patch
+      };
+    }
+
     function renderPlayers() {
       els.playersView.innerHTML = state.players.map((p) => {
         const s = p.stats;
-        return '<div style="margin-bottom:10px;"><b>' + p.nickname + '</b>' +
+        return '<div style="margin-bottom:10px;"><b>' + p.nickname + "（" + p.role + "）</b>" +
+          '<div style="font-size:12px;color:#9fb1c6;margin-top:4px;">装备：' + (p.inventory?.join("、") || "无") + '</div>' +
           '<div class="stats">' +
           statBlock("体力", s.stamina) +
           statBlock("水分", s.water) +
           statBlock("饥饿", s.hunger) +
           statBlock("保温", s.cold) +
           statBlock("压力", s.stress) +
+          statBlock("电量", s.deviceBattery || 0) +
+          statBlock("信号", s.signal || 0) +
           '</div></div>';
       }).join("");
     }
@@ -372,6 +418,24 @@ export function renderDemoPage() {
         const b = await api("/v1/matches/" + state.matchId + "/join", "POST", { playerId: "P2", nickname: "Bob" });
         if (a.error && a.message !== "PLAYER_ALREADY_JOINED") throw new Error(a.message || a.error);
         if (b.error && b.message !== "PLAYER_ALREADY_JOINED") throw new Error(b.message || b.error);
+        for (const p of state.players) {
+          const loadout = randomLoadoutFor(p.id);
+          p.role = loadout.role;
+          p.inventory = loadout.inventory;
+          p.stats = {
+            ...p.stats,
+            stamina: Math.max(10, Math.min(100, p.stats.stamina + loadout.patch.stamina)),
+            cold: Math.max(10, Math.min(100, p.stats.cold + loadout.patch.cold)),
+            stress: Math.max(0, Math.min(100, p.stats.stress + loadout.patch.stress)),
+            loadWeight: loadout.patch.loadWeight,
+            hasShellJacket: loadout.patch.hasShellJacket,
+            hasSatellitePhone: loadout.patch.hasSatellitePhone,
+            hasMap: loadout.patch.hasMap,
+            hasPowerBank: loadout.patch.hasPowerBank,
+            hasHeavyCamera: loadout.patch.hasHeavyCamera
+          };
+        }
+        renderPlayers();
         setStatus(els.lobbyStatus, "两名玩家已加入。", "good");
         log("玩家加入完成", "ok");
       } catch (e) {
@@ -414,10 +478,19 @@ export function renderDemoPage() {
       const payload = {
         viewerPlayerId: "P1",
         playerActions: [
-          { playerId: "P1", action: els.actionP1.value, state: state.players[0].stats },
-          { playerId: "P2", action: els.actionP2.value, state: state.players[1].stats }
-        ],
-        environment: { weather: "cloudy", slope: "flat" }
+          {
+            playerId: "P1",
+            intent: (els.intentP1.value || "").trim(),
+            followupIntent: (els.followupP1.value || "").trim(),
+            state: state.players[0].stats
+          },
+          {
+            playerId: "P2",
+            intent: (els.intentP2.value || "").trim(),
+            followupIntent: (els.followupP2.value || "").trim(),
+            state: state.players[1].stats
+          }
+        ]
       };
       const data = await api("/v1/matches/" + state.matchId + "/resolve-turn", "POST", payload);
       if (data.error) {
@@ -433,6 +506,9 @@ export function renderDemoPage() {
       }
       state.round = data.match.round;
       setStatus(els.turnStatus, "回合结算完成，下一回合: " + state.round, "good");
+      if (data.aiPhase?.broadcast) {
+        els.aiPhaseView.textContent = data.aiPhase.broadcast;
+      }
       els.narration.textContent = data.narration || "无旁白";
       renderPlayers();
       renderMeta(data);
@@ -554,9 +630,14 @@ export function renderDemoPage() {
       setStatus(els.turnStatus, "尚未开局");
       setStatus(els.summaryStatus, "未结束");
       els.narration.textContent = "等待回合结算...";
+      els.aiPhaseView.textContent = "等待回合开始...";
       els.metaView.innerHTML = "";
       els.chatView.textContent = "暂无聊天记录。";
       els.debugLog.textContent = "页面已重置。";
+      els.intentP1.value = "";
+      els.intentP2.value = "";
+      els.followupP1.value = "";
+      els.followupP2.value = "";
       renderPlayers();
       log("已重置页面状态");
     });

@@ -127,6 +127,29 @@ function buildChatContext(matchId, round) {
   });
 }
 
+function buildAiPhaseFromScenario(scenarioId, round) {
+  const detail = SCENARIO_DETAILS[scenarioId] || {};
+  const waypoints = Array.isArray(detail.sampleWaypoints) ? detail.sampleWaypoints : [];
+  if (waypoints.length === 0) return null;
+  const idx = Math.max(0, (Number(round || 1) - 1) % waypoints.length);
+  const waypoint = waypoints[idx];
+  const weather = waypoint.weather || "cloudy";
+  const slope = waypoint.slope || (waypoint.terrain?.includes("坡") ? "rolling" : "flat");
+  const temperatureC = Number(waypoint.temperatureC ?? 10);
+  const broadcast =
+    `当前位置：${waypoint.name}（海拔 ${waypoint.altitude}m）。` +
+    `天气：${weather === "harsh" ? "恶劣天气" : weather === "clear" ? "晴朗" : "多云"}，` +
+    `体感温度约 ${temperatureC}°C。` +
+    `地形：${waypoint.terrain || "山道"}，能见度：${waypoint.visibility || "一般"}。`;
+  return {
+    waypoint,
+    weather,
+    slope,
+    temperatureC,
+    broadcast
+  };
+}
+
 function persistRuntimeState() {
   saveRuntimeStore({
     savedAt: new Date().toISOString(),
@@ -246,10 +269,20 @@ export function createAppServer() {
           viewerPlayerId: "P1",
           players: [{ id: "P1" }, { id: "P2" }],
           playerActions: [
-            { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
-            { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+            {
+              playerId: "P1",
+              intent: "我先前进并观察前方路况，必要时给P2 8水",
+              followupIntent: "如果天气恶化我会先扎营",
+              state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20, hasMap: true, hasShellJacket: true, deviceBattery: 95, signal: 70 }
+            },
+            {
+              playerId: "P2",
+              intent: "我先检查装备，若安全就跟随P1前进",
+              followupIntent: "若我状态差则原地休息",
+              state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24, hasHeavyCamera: true, hasPowerBank: true, loadWeight: 20, deviceBattery: 90, signal: 60 }
+            }
           ],
-          environment: { weather: "cloudy", slope: "flat" }
+          environment: buildAiPhaseFromScenario(scenarioId, created.round) || { weather: "cloudy", slope: "flat" }
         };
         const roundResult = resolveRound(roundInput);
         const aiResult = await generateNarration(roundResult?.narrativePacket || {});
@@ -382,12 +415,22 @@ export function createAppServer() {
         }
 
         const body = await readJsonBody(req);
+        const aiPhase = buildAiPhaseFromScenario(match.scenarioId, match.round);
         const roundInput = {
           ...body,
           matchId,
           round: match.round,
           players: match.partyState.players.map((p) => ({ id: p.playerId })),
-          chatLogs: buildChatContext(matchId, match.round)
+          chatLogs: buildChatContext(matchId, match.round),
+          environment: {
+            weather: body?.environment?.weather || aiPhase?.weather || "cloudy",
+            slope: body?.environment?.slope || aiPhase?.slope || "flat",
+            temperatureC: body?.environment?.temperatureC ?? aiPhase?.temperatureC,
+            waypointName: aiPhase?.waypoint?.name,
+            altitude: aiPhase?.waypoint?.altitude,
+            visibility: aiPhase?.waypoint?.visibility,
+            terrain: aiPhase?.waypoint?.terrain
+          }
         };
         const roundResult = resolveRound(roundInput);
         const aiResult = await generateNarration(roundResult?.narrativePacket || {});
@@ -424,6 +467,7 @@ export function createAppServer() {
         return json(res, 200, {
           match: applied.match,
           ...roundResult,
+          aiPhase,
           narration,
           narrationSource: aiResult.source,
           narrationModel: aiResult.model
