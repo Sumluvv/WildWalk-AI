@@ -245,3 +245,32 @@ test("POST /v1/narration/preview returns Chinese narration text", async (t) => {
   assert.equal(typeof data.narration, "string");
   assert.ok(data.narration.includes("第 3 回合"));
 });
+
+test("POST /v1/round/resolve-and-narrate returns round result and narration", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    seed: 99,
+    round: 4,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+    ],
+    environment: { weather: "cloudy", slope: "flat" }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/round/resolve-and-narrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.ok(data.narrativePacket);
+  assert.equal(typeof data.narration, "string");
+  assert.equal(data.narrationSource, "template-preview");
+});

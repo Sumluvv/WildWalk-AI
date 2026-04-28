@@ -120,6 +120,10 @@
   - 用途：根据 `narrativePacket` 生成模板中文旁白（MVP 预览版）
   - 请求体：`{ narrativePacket }`
   - 返回：`{ narration, source }`
+- `POST /v1/round/resolve-and-narrate`
+  - 用途：一次请求完成“回合结算 + 旁白预览”
+  - 请求体：与 `POST /v1/round/resolve` 相同
+  - 返回：`roundResult + narration + narrationSource`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -170,6 +174,7 @@
 - 新增公开/隐瞒后的二次影响（队友压力与信任联动变化）。
 - 新增 `narrativePacket` 回合叙事打包输出，便于 AI 直接生成旁白。
 - 新增 `POST /v1/narration/preview` 旁白预览接口（模板渲染）。
+- 新增 `POST /v1/round/resolve-and-narrate` 一体化接口，便于前端单次调用。
 
 ### 已知风险与待改进
 

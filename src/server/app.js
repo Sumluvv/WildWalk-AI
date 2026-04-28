@@ -37,6 +37,24 @@ export function createAppServer() {
       }
     }
 
+    if (req.method === "POST" && req.url === "/v1/round/resolve-and-narrate") {
+      try {
+        const body = await readJsonBody(req);
+        const roundResult = resolveRound(body);
+        const narration = renderNarrationPreview(roundResult?.narrativePacket || {});
+        return json(res, 200, {
+          ...roundResult,
+          narration,
+          narrationSource: "template-preview"
+        });
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
     if (req.method === "POST" && req.url === "/v1/narration/preview") {
       try {
         const body = await readJsonBody(req);
