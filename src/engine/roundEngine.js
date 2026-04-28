@@ -21,17 +21,7 @@ function getMultipliers(weather, slope) {
   return { weatherMul, slopeMul };
 }
 
-export function resolveRound(input) {
-  const state = { ...INITIAL_STATS, ...(input?.state || {}) };
-  const weather = input?.environment?.weather || "cloudy";
-  const slope = input?.environment?.slope || "flat";
-  const seed = Number(input?.seed || 1);
-  const round = Number(input?.round || 1);
-  const players = Array.isArray(input?.players) ? input.players : [];
-  const viewerPlayerId = input?.viewerPlayerId;
-  const action = input?.action;
-  const { weatherMul, slopeMul } = getMultipliers(weather, slope);
-
+function resolveSingleState({ state, action, weatherMul, slopeMul }) {
   let staminaLoss = 1.2 * weatherMul.staminaMul * slopeMul.staminaMul;
   if (state.water < 30) staminaLoss += 0.5;
   if (state.hunger < 30) staminaLoss += 0.5;
@@ -57,31 +47,71 @@ export function resolveRound(input) {
     action
   );
 
-  staminaLoss = afterAction.staminaLoss;
-  waterLoss = afterAction.waterLoss;
-  hungerLoss = afterAction.hungerLoss;
-  coldLoss = afterAction.coldLoss;
-  stressGain = afterAction.stressGain;
+  const nextState = {
+    stamina: clamp(state.stamina - afterAction.staminaLoss),
+    water: clamp(state.water - afterAction.waterLoss),
+    hunger: clamp(state.hunger - afterAction.hungerLoss),
+    cold: clamp(state.cold - afterAction.coldLoss),
+    stress: clamp(state.stress + afterAction.stressGain)
+  };
 
-  const stamina = clamp(state.stamina - staminaLoss);
-  const water = clamp(state.water - waterLoss);
-  const hunger = clamp(state.hunger - hungerLoss);
-  const cold = clamp(state.cold - coldLoss);
-  const stress = clamp(state.stress + stressGain);
-
-  const nextState = { stamina, water, hunger, cold, stress };
-  const events = generateRoundEvents({ seed, round, players });
-  const visibleEvents = filterVisibleEvents(events, viewerPlayerId);
   return {
+    action: afterAction.action,
+    nextState,
     numericDelta: {
       stamina: Number((nextState.stamina - state.stamina).toFixed(2)),
       water: Number((nextState.water - state.water).toFixed(2)),
       hunger: Number((nextState.hunger - state.hunger).toFixed(2)),
       cold: Number((nextState.cold - state.cold).toFixed(2)),
       stress: Number((nextState.stress - state.stress).toFixed(2))
-    },
-    action: afterAction.action,
-    nextState,
+    }
+  };
+}
+
+export function resolveRound(input) {
+  const state = { ...INITIAL_STATS, ...(input?.state || {}) };
+  const weather = input?.environment?.weather || "cloudy";
+  const slope = input?.environment?.slope || "flat";
+  const seed = Number(input?.seed || 1);
+  const round = Number(input?.round || 1);
+  const players = Array.isArray(input?.players) ? input.players : [];
+  const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
+  const viewerPlayerId = input?.viewerPlayerId;
+  const action = input?.action;
+  const { weatherMul, slopeMul } = getMultipliers(weather, slope);
+  const events = generateRoundEvents({ seed, round, players });
+  const visibleEvents = filterVisibleEvents(events, viewerPlayerId);
+
+  if (playerActions.length > 0) {
+    const perPlayerResults = playerActions.map((entry) => {
+      const playerId = entry?.playerId || "unknown";
+      const playerState = { ...INITIAL_STATS, ...(entry?.state || {}) };
+      const one = resolveSingleState({
+        state: playerState,
+        action: entry?.action,
+        weatherMul,
+        slopeMul
+      });
+
+      return {
+        playerId,
+        ...one,
+        visibleEvents: filterVisibleEvents(events, playerId)
+      };
+    });
+
+    return {
+      events,
+      visibleEvents,
+      perPlayerResults
+    };
+  }
+
+  const one = resolveSingleState({ state, action, weatherMul, slopeMul });
+  return {
+    numericDelta: one.numericDelta,
+    action: one.action,
+    nextState: one.nextState,
     events,
     visibleEvents
   };

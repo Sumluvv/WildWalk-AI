@@ -135,3 +135,31 @@ test("hydrate action improves water result compared to move", () => {
 
   assert.ok(hydrateResult.numericDelta.water > moveResult.numericDelta.water);
 });
+
+test("playerActions returns per-player results", () => {
+  const result = resolveRound({
+    seed: 99,
+    round: 2,
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      {
+        playerId: "P1",
+        action: "move",
+        state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 }
+      },
+      {
+        playerId: "P2",
+        action: "camp",
+        state: { stamina: 45, water: 40, hunger: 50, cold: 60, stress: 35 }
+      }
+    ],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  assert.ok(Array.isArray(result.perPlayerResults));
+  assert.equal(result.perPlayerResults.length, 2);
+  assert.equal(result.perPlayerResults[0].playerId, "P1");
+  assert.equal(result.perPlayerResults[1].playerId, "P2");
+  assert.ok(result.perPlayerResults[0].numericDelta);
+  assert.ok(result.perPlayerResults[1].nextState);
+});

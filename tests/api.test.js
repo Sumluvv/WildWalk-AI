@@ -70,3 +70,41 @@ test("POST /v1/round/resolve returns 400 for invalid JSON", async (t) => {
   assert.equal(res.status, 400);
   assert.equal(data.error, "BAD_REQUEST");
 });
+
+test("POST /v1/round/resolve supports multiplayer playerActions", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    seed: 22,
+    round: 2,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      {
+        playerId: "P1",
+        action: "move",
+        state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 }
+      },
+      {
+        playerId: "P2",
+        action: "camp",
+        state: { stamina: 50, water: 60, hunger: 60, cold: 65, stress: 30 }
+      }
+    ],
+    environment: { weather: "cloudy", slope: "rolling" }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/round/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.ok(Array.isArray(data.perPlayerResults));
+  assert.equal(data.perPlayerResults.length, 2);
+  assert.equal(data.perPlayerResults[0].playerId, "P1");
+  assert.equal(data.perPlayerResults[1].playerId, "P2");
+});
