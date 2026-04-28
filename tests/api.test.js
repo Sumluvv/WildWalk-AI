@@ -179,4 +179,6 @@ test("betrayalActions are returned with trust matrix updates", async (t) => {
   assert.equal(data.betrayalResults[0].status, "applied");
   const trust = data.trustMatrix.find((x) => x.fromPlayerId === "A" && x.toPlayerId === "B");
   assert.ok(trust.value < 65);
+  assert.ok(Array.isArray(data.trustChanges));
+  assert.ok(data.trustChanges.length >= 1);
 });

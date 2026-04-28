@@ -251,3 +251,29 @@ test("betrayal action reduces trust and increases target stress", () => {
   const target = result.perPlayerResults.find((p) => p.playerId === "B");
   assert.ok(target.nextState.stress > 20);
 });
+
+test("trust evolves automatically after transfer and betrayal", () => {
+  const result = resolveRound({
+    seed: 501,
+    round: 7,
+    players: [{ id: "A" }, { id: "B" }],
+    playerActions: [
+      { playerId: "A", action: "camp", state: { stamina: 80, water: 90, hunger: 70, cold: 80, stress: 20 } },
+      { playerId: "B", action: "move", state: { stamina: 80, water: 30, hunger: 70, cold: 80, stress: 20 } }
+    ],
+    transfers: [{ fromPlayerId: "A", toPlayerId: "B", resource: "water", amount: 8, isHidden: false }],
+    betrayalActions: [{ actorPlayerId: "A", targetPlayerId: "B", type: "hide_supply" }],
+    trustMatrix: [
+      { fromPlayerId: "A", toPlayerId: "B", value: 60 },
+      { fromPlayerId: "B", toPlayerId: "A", value: 40 }
+    ],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  const trustAB = result.trustMatrix.find((x) => x.fromPlayerId === "A" && x.toPlayerId === "B");
+  const trustBA = result.trustMatrix.find((x) => x.fromPlayerId === "B" && x.toPlayerId === "A");
+  assert.ok(trustAB.value < 60);
+  assert.ok(trustBA.value > 40);
+  assert.ok(Array.isArray(result.trustChanges));
+  assert.ok(result.trustChanges.length >= 2);
+});

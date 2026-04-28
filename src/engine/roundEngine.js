@@ -102,6 +102,11 @@ function trustMatrixFromMap(trustMap) {
   return result;
 }
 
+function adjustTrustDelta(trustMap, fromId, toId, delta) {
+  const current = Number(trustMap.get(`${fromId}->${toId}`) ?? 0);
+  setTrustValue(trustMap, fromId, toId, current + delta);
+}
+
 function getTrustValue(trustMatrix, fromId, toId) {
   const found = trustMatrix.find((t) => t?.fromPlayerId === fromId && t?.toPlayerId === toId);
   return Number(found?.value ?? 0);
@@ -237,6 +242,44 @@ function applyBetrayalActions(perPlayerResults, betrayalActions = [], trustMap) 
   return results;
 }
 
+function evolveTrustFromRound({ trustMap, transferResults = [], betrayalResults = [] }) {
+  const changes = [];
+
+  for (const transfer of transferResults) {
+    if (transfer?.status !== "applied") continue;
+    const fromId = transfer.fromPlayerId;
+    const toId = transfer.toPlayerId;
+    if (!fromId || !toId) continue;
+
+    const gain = transfer.isHidden ? 1 : 2;
+    adjustTrustDelta(trustMap, toId, fromId, gain);
+    changes.push({
+      fromPlayerId: toId,
+      toPlayerId: fromId,
+      delta: gain,
+      reason: transfer.isHidden ? "hidden_transfer_applied" : "public_transfer_applied"
+    });
+  }
+
+  for (const betrayal of betrayalResults) {
+    if (betrayal?.status !== "applied") continue;
+    const actorId = betrayal.actorPlayerId;
+    const targetId = betrayal.targetPlayerId;
+    if (!actorId || !targetId) continue;
+
+    const extraDrop = betrayal.type === "fake_info" ? -4 : -2;
+    adjustTrustDelta(trustMap, actorId, targetId, extraDrop);
+    changes.push({
+      fromPlayerId: actorId,
+      toPlayerId: targetId,
+      delta: extraDrop,
+      reason: `betrayal_${betrayal.type}`
+    });
+  }
+
+  return changes;
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -280,6 +323,11 @@ export function resolveRound(input) {
       trustMatrixFromMap(trustMap)
     );
     const betrayalResults = applyBetrayalActions(perPlayerResults, betrayalActions, trustMap);
+    const trustChanges = evolveTrustFromRound({
+      trustMap,
+      transferResults,
+      betrayalResults
+    });
 
     for (const player of perPlayerResults) {
       delete player.baseState;
@@ -289,6 +337,7 @@ export function resolveRound(input) {
       events,
       visibleEvents,
       trustMatrix: trustMatrixFromMap(trustMap),
+      trustChanges,
       transferResults,
       betrayalResults,
       perPlayerResults
