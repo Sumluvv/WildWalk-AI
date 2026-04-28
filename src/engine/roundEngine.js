@@ -493,6 +493,31 @@ function buildNarrativePacket({
   };
 }
 
+function buildAiAdjudication(perPlayerResults = [], transferResults = [], betrayalResults = []) {
+  const lines = [];
+  for (const p of perPlayerResults) {
+    if (!p) continue;
+    lines.push(
+      `${p.playerId} 行动判定：主行动=${p.action || "check"}；` +
+        `体力${p.numericDelta?.stamina ?? 0}，水分${p.numericDelta?.water ?? 0}，饥饿${p.numericDelta?.hunger ?? 0}。`
+    );
+    for (const used of p.consumedItems || []) {
+      lines.push(`${p.playerId} 使用物品：${used.itemId} x${used.quantity}`);
+    }
+  }
+  for (const t of transferResults || []) {
+    if (t.status === "applied") {
+      lines.push(`物资传递：${t.fromPlayerId} -> ${t.toPlayerId} ${t.resource}+${t.movedAmount}`);
+    }
+  }
+  for (const b of betrayalResults || []) {
+    if (b.status === "applied") {
+      lines.push(`背刺事件：${b.actorPlayerId} 对 ${b.targetPlayerId} 执行 ${b.type}`);
+    }
+  }
+  return lines;
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -580,6 +605,7 @@ export function resolveRound(input) {
       disclosureConsequences,
       transferResults,
       betrayalResults,
+      aiAdjudication: buildAiAdjudication(perPlayerResults, transferResults, betrayalResults),
       perPlayerResults,
       narrativePacket: buildNarrativePacket({
         round,

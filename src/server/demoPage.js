@@ -151,6 +151,11 @@ export function renderDemoPage() {
       </section>
 
       <section class="card full">
+        <h3>AI 裁定结果（Resolution Phase）</h3>
+        <div id="judgeView" class="log">等待回合结算...</div>
+      </section>
+
+      <section class="card full">
         <h3>玩家状态</h3>
         <div id="playersView"></div>
       </section>
@@ -190,6 +195,11 @@ export function renderDemoPage() {
         <h3>调试日志</h3>
         <div id="debugLog" class="log">页面已加载。</div>
       </section>
+
+      <section class="card full">
+        <h3>游戏结束总结</h3>
+        <div id="summaryView" class="narr">尚未结束对局，暂无总结。</div>
+      </section>
     </div>
   </div>
 
@@ -214,6 +224,8 @@ export function renderDemoPage() {
       summaryStatus: document.getElementById("summaryStatus"),
       aiPhaseView: document.getElementById("aiPhaseView"),
       narration: document.getElementById("narration"),
+      judgeView: document.getElementById("judgeView"),
+      summaryView: document.getElementById("summaryView"),
       playersView: document.getElementById("playersView"),
       metaView: document.getElementById("metaView"),
       debugLog: document.getElementById("debugLog"),
@@ -457,6 +469,16 @@ export function renderDemoPage() {
       els.metaView.innerHTML = pills.length ? pills.join("") : '<span class="pill">本回合无显著事件</span>';
     }
 
+    function renderSummary(summary, reason) {
+      if (!summary) return;
+      const badge = summary.badge || {};
+      els.summaryView.textContent =
+        "结局：" + reason + "\n\n" +
+        "航迹勋章：" + (badge.title || "未知") + "（" + (badge.level || "-") + "）\n" +
+        "关键统计：" + JSON.stringify(badge.stats || {}, null, 2) + "\n\n" +
+        "徒步日记：\n" + (summary.diary || "暂无");
+    }
+
     function getOrCreateInventoryItem(player, itemId, fallbackName, consumable = true) {
       let found = (player.inventory || []).find((x) => x.id === itemId);
       if (!found) {
@@ -663,6 +685,9 @@ export function renderDemoPage() {
         els.aiPhaseView.textContent = data.aiPhase.broadcast;
       }
       els.narration.textContent = data.narration || "无旁白";
+      els.judgeView.textContent = Array.isArray(data.aiAdjudication) && data.aiAdjudication.length
+        ? data.aiAdjudication.join("\n")
+        : "本回合无额外判定明细。";
       renderPlayers();
       renderMeta(data);
       log("完成第 " + (state.round - 1) + " 回合结算", "ok");
@@ -689,6 +714,7 @@ export function renderDemoPage() {
             "自动结局：" + autoReason + " | 徒步日记已生成 | 勋章：" + summary.badge.title + "（" + summary.badge.level + "）",
             autoReason === "summit_success" ? "good" : "warn"
           );
+          renderSummary(summary, autoReason);
           log("自动触发结局：" + autoReason, "ok");
         }
       }
@@ -757,6 +783,7 @@ export function renderDemoPage() {
       }
       const summary = await api("/v1/match/" + state.matchId + "/summary");
       setStatus(els.summaryStatus, "对局已结束: " + finish.finishReason + " | 勋章: " + summary.badge.title + " (" + summary.badge.level + ")", "good");
+      renderSummary(summary, finish.finishReason);
       log("对局结束并拉取总结", "ok");
     });
 
@@ -782,6 +809,8 @@ export function renderDemoPage() {
         setStatus(els.turnStatus, "自动完成 1 回合结算。", "good");
         setStatus(els.summaryStatus, "自动结束: " + data.finalMatch.finishReason + " | 勋章: " + data.summary.badge.title + " (" + data.summary.badge.level + ")", "good");
         els.narration.textContent = data.narration || "无旁白";
+        els.judgeView.textContent = Array.isArray(data.roundResult?.aiAdjudication) ? data.roundResult.aiAdjudication.join("\n") : "自动试玩未返回判定明细";
+        renderSummary(data.summary, data.finalMatch.finishReason);
         renderMeta(data.roundResult || {});
         renderPlayers();
         log("一键自动试玩完成", "ok");
@@ -814,7 +843,9 @@ export function renderDemoPage() {
       setStatus(els.turnStatus, "尚未开局");
       setStatus(els.summaryStatus, "未结束");
       els.narration.textContent = "等待回合结算...";
+      els.judgeView.textContent = "等待回合结算...";
       els.aiPhaseView.textContent = "等待回合开始...";
+      els.summaryView.textContent = "尚未结束对局，暂无总结。";
       els.metaView.innerHTML = "";
       els.chatView.textContent = "暂无聊天记录。";
       els.debugLog.textContent = "页面已重置。";

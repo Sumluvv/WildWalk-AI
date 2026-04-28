@@ -274,6 +274,7 @@ test("POST /v1/matches/:id/resolve-turn supports free-text intents and ai phase"
   assert.ok(Array.isArray(resolved.transferResults));
   assert.ok(resolved.perPlayerResults.every((x) => typeof x.nextState.deviceBattery === "number"));
   assert.ok(Array.isArray(resolved.perPlayerResults[0].consumedItems));
+  assert.ok(Array.isArray(resolved.aiAdjudication));
 });
 
 test("POST /v1/matches/:id/finish marks match finished", async (t) => {
