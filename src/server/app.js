@@ -1,5 +1,6 @@
 import http from "node:http";
 import { resolveRound } from "../engine/roundEngine.js";
+import { renderNarrationPreview } from "../narration/templateNarration.js";
 
 function json(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
@@ -28,6 +29,22 @@ export function createAppServer() {
         const body = await readJsonBody(req);
         const result = resolveRound(body);
         return json(res, 200, result);
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "POST" && req.url === "/v1/narration/preview") {
+      try {
+        const body = await readJsonBody(req);
+        const narration = renderNarrationPreview(body?.narrativePacket || {});
+        return json(res, 200, {
+          narration,
+          source: "template-preview"
+        });
       } catch (error) {
         return json(res, 400, {
           error: "BAD_REQUEST",

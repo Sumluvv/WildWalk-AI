@@ -214,3 +214,34 @@ test("eventDisclosures returns disclosure results and team intel", async (t) => 
   assert.ok(data.narrativePacket);
   assert.equal(typeof data.narrativePacket.summary.publicEventCount, "number");
 });
+
+test("POST /v1/narration/preview returns Chinese narration text", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    narrativePacket: {
+      round: 3,
+      environment: { weather: "cloudy", slope: "flat" },
+      summary: {
+        publicEventCount: 1,
+        privateEventCount: 2,
+        sharedIntelCount: 1,
+        appliedTransfers: 1,
+        appliedBetrayals: 0,
+        trustChangeCount: 2
+      }
+    }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/narration/preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(typeof data.narration, "string");
+  assert.ok(data.narration.includes("第 3 回合"));
+});
