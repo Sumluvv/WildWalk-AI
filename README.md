@@ -76,6 +76,7 @@
 - `action`: 单人模式行动（`move/camp/hydrate/check`）
 - `playerActions[]`: 多人模式行动数组（每项含 `playerId + action + state`）
 - `transfers[]`: 多人资源分享数组（每项含 `fromPlayerId + toPlayerId + resource + amount`）
+- `trustMatrix[]`: 玩家信任矩阵（每项含 `fromPlayerId + toPlayerId + value`）
 
 ### 回合输出（RoundResult）
 
@@ -97,6 +98,10 @@
   - 说明：`visibleEvents` 已按 `viewerPlayerId` 过滤，仅包含该玩家可见事件（公开 + 该玩家私有）
   - MVP 行动枚举：`move`（前进）`camp`（扎营）`hydrate`（补水）`check`（检查装备）
   - MVP 分享资源：`resource` 支持 `water` 或 `hunger`
+  - `transfers[]` 扩展：
+    - `isHidden`: 是否私下交易（仅双方可见）
+    - `requiresTrust`: 最低信任值门槛，未达到则阻断
+  - 多人返回新增：`transferResults[]`（每笔分享状态，如 `applied` / `blocked_trust`）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -140,6 +145,7 @@
 - 新增行动输入 `action` 对数值结算的直接影响（前进/扎营/补水/检查）。
 - 新增多人 `playerActions[]` 逐玩家结算输出（`perPlayerResults`），对接多人回合制。
 - 新增多人资源分享 `transfers[]` 联动结算（如分享水/食物）。
+- 新增私下交易与信任门槛规则（`isHidden` + `requiresTrust` + `trustMatrix`）。
 
 ### 已知风险与待改进
 

@@ -192,3 +192,41 @@ test("transfers move water between players in multiplayer mode", () => {
   assert.ok(p1.nextState.water < 80);
   assert.ok(p2.nextState.water > 20);
 });
+
+test("transfer with unmet trust requirement is blocked", () => {
+  const result = resolveRound({
+    seed: 200,
+    round: 5,
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      {
+        playerId: "P1",
+        action: "camp",
+        state: { stamina: 80, water: 80, hunger: 70, cold: 85, stress: 20 }
+      },
+      {
+        playerId: "P2",
+        action: "move",
+        state: { stamina: 80, water: 20, hunger: 70, cold: 85, stress: 20 }
+      }
+    ],
+    transfers: [
+      {
+        fromPlayerId: "P1",
+        toPlayerId: "P2",
+        resource: "water",
+        amount: 10,
+        requiresTrust: 70,
+        isHidden: true
+      }
+    ],
+    trustMatrix: [{ fromPlayerId: "P1", toPlayerId: "P2", value: 30 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  assert.equal(result.transferResults[0].status, "blocked_trust");
+  const p1 = result.perPlayerResults.find((p) => p.playerId === "P1");
+  const p2 = result.perPlayerResults.find((p) => p.playerId === "P2");
+  assert.ok(p1.visibleTransfers.length === 1);
+  assert.ok(p2.visibleTransfers.length === 1);
+});

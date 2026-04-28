@@ -114,3 +114,37 @@ test("POST /v1/round/resolve supports multiplayer playerActions", async (t) => {
   assert.ok(p1.nextState.water < 75);
   assert.ok(p2.nextState.water > 60);
 });
+
+test("hidden transfer is not visible to unrelated viewer", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const payload = {
+    seed: 23,
+    round: 2,
+    viewerPlayerId: "P3",
+    players: [{ id: "P1" }, { id: "P2" }, { id: "P3" }],
+    playerActions: [
+      { playerId: "P1", action: "move", state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 } },
+      { playerId: "P2", action: "camp", state: { stamina: 50, water: 60, hunger: 60, cold: 65, stress: 30 } },
+      { playerId: "P3", action: "check", state: { stamina: 70, water: 65, hunger: 60, cold: 70, stress: 25 } }
+    ],
+    transfers: [
+      { fromPlayerId: "P1", toPlayerId: "P2", resource: "water", amount: 8, isHidden: true, requiresTrust: 20 }
+    ],
+    trustMatrix: [{ fromPlayerId: "P1", toPlayerId: "P2", value: 50 }],
+    environment: { weather: "cloudy", slope: "rolling" }
+  };
+
+  const res = await fetch(`${baseUrl}/v1/round/resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  const p3 = data.perPlayerResults.find((p) => p.playerId === "P3");
+  assert.ok(Array.isArray(p3.visibleTransfers));
+  assert.equal(p3.visibleTransfers.length, 0);
+});

@@ -78,36 +78,87 @@ function recalculateDelta(baseState, nextState) {
   };
 }
 
-function applyResourceTransfers(perPlayerResults, transfers = []) {
-  if (!Array.isArray(transfers) || transfers.length === 0) return perPlayerResults;
+function getTrustValue(trustMatrix, fromId, toId) {
+  const found = trustMatrix.find((t) => t?.fromPlayerId === fromId && t?.toPlayerId === toId);
+  return Number(found?.value ?? 0);
+}
+
+function visibleTransferForPlayer(transfer, playerId) {
+  if (!transfer) return false;
+  if (!transfer.isHidden) return true;
+  return transfer.fromPlayerId === playerId || transfer.toPlayerId === playerId;
+}
+
+function applyResourceTransfers(perPlayerResults, transfers = [], trustMatrix = []) {
+  if (!Array.isArray(transfers) || transfers.length === 0) return { perPlayerResults, transferResults: [] };
 
   const byId = new Map(perPlayerResults.map((r) => [r.playerId, r]));
+  const transferResults = [];
 
   for (const transfer of transfers) {
     const fromId = transfer?.fromPlayerId;
     const toId = transfer?.toPlayerId;
     const resource = transfer?.resource;
     const amount = Number(transfer?.amount || 0);
-    if (!fromId || !toId || fromId === toId) continue;
-    if (!["water", "hunger"].includes(resource)) continue;
-    if (amount <= 0) continue;
+    const isHidden = Boolean(transfer?.isHidden);
+    const requiresTrust = Number(transfer?.requiresTrust || 0);
+    if (!fromId || !toId || fromId === toId) {
+      transferResults.push({ ...transfer, isHidden, status: "rejected_invalid_players", movedAmount: 0 });
+      continue;
+    }
+    if (!["water", "hunger"].includes(resource)) {
+      transferResults.push({ ...transfer, isHidden, status: "rejected_invalid_resource", movedAmount: 0 });
+      continue;
+    }
+    if (amount <= 0) {
+      transferResults.push({ ...transfer, isHidden, status: "rejected_invalid_amount", movedAmount: 0 });
+      continue;
+    }
 
     const from = byId.get(fromId);
     const to = byId.get(toId);
-    if (!from || !to) continue;
+    if (!from || !to) {
+      transferResults.push({ ...transfer, isHidden, status: "rejected_player_not_found", movedAmount: 0 });
+      continue;
+    }
+
+    const trustValue = getTrustValue(trustMatrix, fromId, toId);
+    if (requiresTrust > 0 && trustValue < requiresTrust) {
+      transferResults.push({
+        ...transfer,
+        isHidden,
+        trustValue,
+        status: "blocked_trust",
+        movedAmount: 0
+      });
+      continue;
+    }
 
     const movable = Math.min(amount, from.nextState[resource]);
-    if (movable <= 0) continue;
+    if (movable <= 0) {
+      transferResults.push({ ...transfer, isHidden, status: "rejected_insufficient_resource", movedAmount: 0 });
+      continue;
+    }
 
     from.nextState[resource] = clamp(from.nextState[resource] - movable);
     to.nextState[resource] = clamp(to.nextState[resource] + movable);
+    transferResults.push({
+      ...transfer,
+      isHidden,
+      trustValue,
+      status: "applied",
+      movedAmount: movable
+    });
   }
 
   for (const player of perPlayerResults) {
     player.numericDelta = recalculateDelta(player.baseState, player.nextState);
+    player.visibleTransfers = transferResults.filter((t) =>
+      visibleTransferForPlayer(t, player.playerId)
+    );
   }
 
-  return perPlayerResults;
+  return { perPlayerResults, transferResults };
 }
 
 export function resolveRound(input) {
@@ -119,6 +170,7 @@ export function resolveRound(input) {
   const players = Array.isArray(input?.players) ? input.players : [];
   const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
   const transfers = Array.isArray(input?.transfers) ? input.transfers : [];
+  const trustMatrix = Array.isArray(input?.trustMatrix) ? input.trustMatrix : [];
   const viewerPlayerId = input?.viewerPlayerId;
   const action = input?.action;
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
@@ -144,7 +196,7 @@ export function resolveRound(input) {
       };
     });
 
-    applyResourceTransfers(perPlayerResults, transfers);
+    const { transferResults } = applyResourceTransfers(perPlayerResults, transfers, trustMatrix);
 
     for (const player of perPlayerResults) {
       delete player.baseState;
@@ -153,6 +205,7 @@ export function resolveRound(input) {
     return {
       events,
       visibleEvents,
+      transferResults,
       perPlayerResults
     };
   }
