@@ -88,9 +88,10 @@
   - 返回：`{ ok: true, service: "wildwalk-ai-backend" }`
 - `POST /v1/round/resolve`
   - 用途：执行单回合数值结算
-  - 请求体：`RoundInput`（当前最小实现使用 `state + environment + seed + round + players + viewerPlayerId`）
-  - 返回：`{ numericDelta, nextState, events, visibleEvents }`
+  - 请求体：`RoundInput`（当前最小实现使用 `state + environment + seed + round + players + viewerPlayerId + action`）
+  - 返回：`{ numericDelta, action, nextState, events, visibleEvents }`
   - 说明：`visibleEvents` 已按 `viewerPlayerId` 过滤，仅包含该玩家可见事件（公开 + 该玩家私有）
+  - MVP 行动枚举：`move`（前进）`camp`（扎营）`hydrate`（补水）`check`（检查装备）
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -131,6 +132,7 @@
 - 新增最小 HTTP API（健康检查 + 回合结算）与接口集成测试。
 - 新增 `seed` 可回放随机事件与公开/私有事件分发逻辑。
 - 新增玩家视角事件过滤（`viewerPlayerId -> visibleEvents`），便于客户端直接渲染。
+- 新增行动输入 `action` 对数值结算的直接影响（前进/扎营/补水/检查）。
 
 ### 已知风险与待改进
 

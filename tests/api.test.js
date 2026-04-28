@@ -28,6 +28,7 @@ test("POST /v1/round/resolve returns numericDelta and player-visible events", as
     seed: 11,
     round: 1,
     viewerPlayerId: "A",
+    action: "camp",
     players: [{ id: "A" }, { id: "B" }],
     state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
     environment: { weather: "cloudy", slope: "flat" }
@@ -45,6 +46,7 @@ test("POST /v1/round/resolve returns numericDelta and player-visible events", as
   assert.ok(data.nextState);
   assert.ok(Array.isArray(data.events));
   assert.ok(Array.isArray(data.visibleEvents));
+  assert.equal(data.action, "camp");
   assert.equal(typeof data.nextState.stamina, "number");
 
   for (const event of data.visibleEvents) {
