@@ -33,6 +33,20 @@ test("GET /v1/scenarios returns built-in scenario list", async (t) => {
   assert.ok(data.scenarios.some((s) => s.id === "kyoto-daimonji"));
 });
 
+test("GET /v1/scenarios/:id returns scenario detail", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/scenarios/kyoto-daimonji`);
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(data.id, "kyoto-daimonji");
+  assert.ok(data.detail);
+  assert.ok(Array.isArray(data.detail.strategyTips));
+  assert.ok(Array.isArray(data.detail.sampleWaypoints));
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());

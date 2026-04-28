@@ -140,6 +140,9 @@
 - `GET /v1/scenarios`
   - 用途：获取可选徒步路线列表（MVP 内置版）
   - 返回：`{ total, scenarios[] }`
+- `GET /v1/scenarios/:scenarioId`
+  - 用途：获取单条路线详情（天气分布、建议策略、示例路点）
+  - 返回：`scenarioSummary + detail`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -196,6 +199,7 @@
 - 新增 `GET /v1/match/:matchId/badge`，可返回称号、等级与关键统计。
 - 新增 `GET /v1/match/:matchId/summary`，便于前端一接口渲染赛后页。
 - 新增 `GET /v1/scenarios`，支持“选路线”页面直接拉取路线列表。
+- 新增 `GET /v1/scenarios/:scenarioId`，支持“路线详情页”展示。
 
 ### 已知风险与待改进
 

@@ -4,7 +4,7 @@ import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
-import { SCENARIOS } from "../data/scenarios.js";
+import { SCENARIOS, SCENARIO_DETAILS } from "../data/scenarios.js";
 
 function json(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
@@ -32,6 +32,19 @@ export function createAppServer() {
       return json(res, 200, {
         total: SCENARIOS.length,
         scenarios: SCENARIOS
+      });
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/v1/scenarios/")) {
+      const scenarioId = req.url.slice("/v1/scenarios/".length);
+      const summary = SCENARIOS.find((s) => s.id === scenarioId);
+      if (!summary) {
+        return json(res, 404, { error: "NOT_FOUND", message: "Scenario not found" });
+      }
+      const detail = SCENARIO_DETAILS[scenarioId] || {};
+      return json(res, 200, {
+        ...summary,
+        detail
       });
     }
 
