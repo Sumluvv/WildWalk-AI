@@ -38,7 +38,7 @@ function json(res, statusCode, payload) {
     "Content-Type": "application/json; charset=utf-8",
     "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization"
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-admin-key"
   });
   res.end(JSON.stringify(payload));
 }
@@ -174,7 +174,7 @@ export function createAppServer() {
       res.writeHead(204, {
         "Access-Control-Allow-Origin": process.env.CORS_ORIGIN || "*",
         "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-admin-key"
       });
       res.end();
       return;

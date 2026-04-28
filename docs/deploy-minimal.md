@@ -52,6 +52,15 @@ curl http://127.0.0.1:3000/healthz
 {"ok":true,"service":"wildwalk-ai-backend","db":{"ok":true}}
 ```
 
+如果你开启了：
+
+- `REQUIRE_ADMIN_KEY=true`
+
+那么：
+
+- 浏览器 Demo 页面里要先填写 `Admin Key`
+- 你自己的前端写请求也必须带 `x-admin-key`
+
 如果你开启了 `REQUIRE_ADMIN_KEY=true`，跑冒烟测试要这样执行：
 
 ```bash
@@ -67,6 +76,13 @@ ADMIN_API_KEY=你在.env里设置的值 ./scripts/smoke.sh
 如果公网打不开，请检查腾讯云轻量服务器的：
 - 防火墙/安全组是否放行 `3000`
 - 如果用了 Nginx，是否放行 `80/443`
+
+容器状态检查：
+
+```bash
+docker compose ps
+docker inspect wildwalk-ai --format='{{json .State.Health}}'
+```
 
 ## 5. 回滚方案（最小）
 

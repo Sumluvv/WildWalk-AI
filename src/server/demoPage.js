@@ -57,6 +57,10 @@ export function renderDemoPage() {
       <section class="card">
         <h3>1) 选择路线与开房</h3>
         <div class="row">
+          <label>管理 Key（若服务器开启鉴权）</label>
+          <input id="adminKey" placeholder="可留空；若写接口 401，请填写 .env 中 ADMIN_API_KEY" />
+        </div>
+        <div class="row">
           <label>路线</label>
           <select id="scenarioId"></select>
         </div>
@@ -156,6 +160,7 @@ export function renderDemoPage() {
   <script>
     const els = {
       scenarioId: document.getElementById("scenarioId"),
+      adminKey: document.getElementById("adminKey"),
       createBtn: document.getElementById("createBtn"),
       joinBtn: document.getElementById("joinBtn"),
       readyBtn: document.getElementById("readyBtn"),
@@ -197,6 +202,8 @@ export function renderDemoPage() {
       ],
       chats: []
     };
+
+    els.adminKey.value = localStorage.getItem("wildwalk_admin_key") || "";
 
     function setStatus(el, text, type) {
       el.className = "status" + (type ? " " + type : "");
@@ -317,9 +324,15 @@ export function renderDemoPage() {
     }
 
     async function api(path, method = "GET", body) {
+      const headers = { "Content-Type": "application/json" };
+      const adminKey = (els.adminKey.value || "").trim();
+      if (adminKey) {
+        headers["x-admin-key"] = adminKey;
+        localStorage.setItem("wildwalk_admin_key", adminKey);
+      }
       const res = await fetch(path, {
         method,
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: body ? JSON.stringify(body) : undefined
       });
       return res.json();

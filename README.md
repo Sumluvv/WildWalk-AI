@@ -335,6 +335,9 @@
 - 新增 `scripts/smoke.sh`，支持上线前一键核心链路自检。
 - 新增 `docs/api-integration-guide.md`，详细说明服务器部署、数据库设置与 API 接入步骤。
 - 新增 `.dockerignore` 并补强 `.gitignore`，避免部署镜像误带运行数据。
+- 修复开启 Admin Key 后的浏览器接入链路（CORS + Demo 页面可填写管理 Key）。
+- Docker 镜像切换为更稳的 `node:20-bookworm-slim`，降低 `better-sqlite3` 构建失败风险。
+- 新增 Docker Compose 健康检查，便于服务器上快速确认容器是否真正可用。
 
 ### 已知风险与待改进
 
