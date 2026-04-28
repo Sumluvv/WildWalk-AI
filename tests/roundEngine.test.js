@@ -317,4 +317,6 @@ test("disclosure consequences adjust stress and trust", () => {
   const trust = result.trustMatrix.find((x) => x.fromPlayerId === "P2" && x.toPlayerId === "P1");
   assert.ok(trust.value <= 50);
   assert.ok(Array.isArray(result.disclosureConsequences));
+  assert.ok(result.narrativePacket);
+  assert.equal(result.narrativePacket.round, 9);
 });

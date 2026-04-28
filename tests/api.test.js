@@ -211,4 +211,6 @@ test("eventDisclosures returns disclosure results and team intel", async (t) => 
   assert.ok(Array.isArray(data.disclosureResults));
   assert.ok(Array.isArray(data.teamIntel));
   assert.ok(Array.isArray(data.disclosureConsequences));
+  assert.ok(data.narrativePacket);
+  assert.equal(typeof data.narrativePacket.summary.publicEventCount, "number");
 });
