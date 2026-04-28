@@ -4,6 +4,7 @@ import { renderNarrationPreview } from "../narration/templateNarration.js";
 import { buildMatchDiary } from "../narration/diaryBuilder.js";
 import { buildMatchBadge } from "../narration/badgeBuilder.js";
 import { appendMatchLog, getMatchLogs } from "./matchLogStore.js";
+import { createMatch } from "./matchStore.js";
 import { SCENARIOS, SCENARIO_DETAILS } from "../data/scenarios.js";
 
 function json(res, statusCode, payload) {
@@ -33,6 +34,27 @@ export function createAppServer() {
         total: SCENARIOS.length,
         scenarios: SCENARIOS
       });
+    }
+
+    if (req.method === "POST" && req.url === "/v1/matches") {
+      try {
+        const body = await readJsonBody(req);
+        const scenarioId = body?.scenarioId;
+        const scenario = SCENARIOS.find((s) => s.id === scenarioId);
+        if (!scenario) {
+          return json(res, 400, { error: "BAD_REQUEST", message: "Invalid scenarioId" });
+        }
+        const match = createMatch({ scenarioId });
+        return json(res, 200, {
+          ...match,
+          scenario
+        });
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
     }
 
     if (req.method === "GET" && req.url.startsWith("/v1/scenarios/")) {

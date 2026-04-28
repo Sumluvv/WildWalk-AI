@@ -143,6 +143,10 @@
 - `GET /v1/scenarios/:scenarioId`
   - 用途：获取单条路线详情（天气分布、建议策略、示例路点）
   - 返回：`scenarioSummary + detail`
+- `POST /v1/matches`
+  - 用途：根据路线创建新对局（开局入口）
+  - 请求体：`{ scenarioId }`
+  - 返回：`{ matchId, scenarioId, round, status, partyState, scenario }`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -200,6 +204,7 @@
 - 新增 `GET /v1/match/:matchId/summary`，便于前端一接口渲染赛后页。
 - 新增 `GET /v1/scenarios`，支持“选路线”页面直接拉取路线列表。
 - 新增 `GET /v1/scenarios/:scenarioId`，支持“路线详情页”展示。
+- 新增 `POST /v1/matches`，支持从路线详情页一键开局。
 
 ### 已知风险与待改进
 

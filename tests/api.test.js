@@ -47,6 +47,39 @@ test("GET /v1/scenarios/:id returns scenario detail", async (t) => {
   assert.ok(Array.isArray(data.detail.sampleWaypoints));
 });
 
+test("POST /v1/matches creates match from scenarioId", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 200);
+  assert.equal(data.scenarioId, "kyoto-daimonji");
+  assert.equal(data.round, 1);
+  assert.equal(data.status, "waiting");
+  assert.ok(typeof data.matchId === "string");
+});
+
+test("POST /v1/matches rejects invalid scenarioId", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const res = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "invalid-scenario" })
+  });
+  const data = await res.json();
+
+  assert.equal(res.status, 400);
+  assert.equal(data.error, "BAD_REQUEST");
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());
