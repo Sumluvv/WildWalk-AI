@@ -1,0 +1,14 @@
+{
+  "name": "wildwalk-ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "WildWalk AI backend MVP round engine",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
