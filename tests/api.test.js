@@ -28,7 +28,7 @@ test("GET /demo returns html page", async (t) => {
   const text = await res.text();
 
   assert.equal(res.status, 200);
-  assert.ok(text.includes("WildWalk AI 一键试玩页"));
+  assert.ok(text.includes("WildWalk AI 可试玩 Demo"));
 });
 
 test("GET /v1/scenarios returns built-in scenario list", async (t) => {
