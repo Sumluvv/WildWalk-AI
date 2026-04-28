@@ -182,6 +182,31 @@ test("POST /v1/matches/:id/resolve-turn resolves and advances round", async (t) 
   assert.equal(resolved.match.round, 2);
 });
 
+test("POST /v1/matches/:id/finish marks match finished", async (t) => {
+  const { server, baseUrl } = await startTestServer();
+  t.after(() => server.close());
+
+  const createRes = await fetch(`${baseUrl}/v1/matches`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scenarioId: "kyoto-daimonji" })
+  });
+  const created = await createRes.json();
+  const matchId = created.matchId;
+  assert.equal(createRes.status, 200);
+
+  const finishRes = await fetch(`${baseUrl}/v1/matches/${matchId}/finish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: "summit_success" })
+  });
+  const finished = await finishRes.json();
+
+  assert.equal(finishRes.status, 200);
+  assert.equal(finished.status, "finished");
+  assert.equal(finished.finishReason, "summit_success");
+});
+
 test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());

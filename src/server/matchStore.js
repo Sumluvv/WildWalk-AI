@@ -81,3 +81,17 @@ export function applyTurnResult(matchId, payload = {}) {
   match.updatedAt = new Date().toISOString();
   return { match };
 }
+
+export function finishMatch(matchId, reason) {
+  const match = matches.get(matchId);
+  if (!match) return { error: "NOT_FOUND" };
+  if (match.status === "finished") return { error: "MATCH_ALREADY_FINISHED" };
+
+  const allowed = ["summit_success", "all_dead", "rescue_abort"];
+  if (!allowed.includes(reason)) return { error: "INVALID_FINISH_REASON" };
+
+  match.status = "finished";
+  match.finishReason = reason;
+  match.finishedAt = new Date().toISOString();
+  return { match };
+}

@@ -10,7 +10,8 @@ import {
   markReady,
   startMatch,
   getMatch,
-  applyTurnResult
+  applyTurnResult,
+  finishMatch
 } from "./matchStore.js";
 import { SCENARIOS, SCENARIO_DETAILS } from "../data/scenarios.js";
 
@@ -181,6 +182,28 @@ export function createAppServer() {
           narration,
           narrationSource: "template-preview"
         });
+      } catch (error) {
+        return json(res, 400, {
+          error: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Unknown request error"
+        });
+      }
+    }
+
+    if (req.method === "POST" && req.url.startsWith("/v1/matches/") && req.url.endsWith("/finish")) {
+      try {
+        const prefix = "/v1/matches/";
+        const suffix = "/finish";
+        const matchId = req.url.slice(prefix.length, req.url.length - suffix.length);
+        const body = await readJsonBody(req);
+        const result = finishMatch(matchId, body?.reason);
+        if (result.error === "NOT_FOUND") {
+          return json(res, 404, { error: "NOT_FOUND", message: "Match not found" });
+        }
+        if (result.error) {
+          return json(res, 400, { error: "BAD_REQUEST", message: result.error });
+        }
+        return json(res, 200, result.match);
       } catch (error) {
         return json(res, 400, {
           error: "BAD_REQUEST",

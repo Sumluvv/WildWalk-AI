@@ -159,6 +159,10 @@
   - 用途：按房间当前回合自动结算并推进回合号
   - 请求体：回合输入（如 `playerActions/environment/viewerPlayerId`）
   - 返回：`{ match, roundResult..., narration, narrationSource }`
+- `POST /v1/matches/:matchId/finish`
+  - 用途：结束对局并写入结束原因
+  - 请求体：`{ reason }`
+  - reason 枚举：`summit_success` / `all_dead` / `rescue_abort`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -219,6 +223,7 @@
 - 新增 `POST /v1/matches`，支持从路线详情页一键开局。
 - 新增 `join/ready/start` 房间流程接口，打通“创建房间 -> 准备 -> 开局”。
 - 新增 `resolve-turn` 房间回合接口，减少前端拼装回合上下文的负担。
+- 新增 `finish` 对局结束接口，覆盖登顶成功/全灭/救援中止。
 
 ### 已知风险与待改进
 
