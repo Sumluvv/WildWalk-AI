@@ -31,7 +31,8 @@ function parsePlayerId(text) {
 export function parseIntentDirectives({ playerId, intentText, followupIntent }) {
   const directives = {
     transfers: [],
-    betrayalActions: []
+    betrayalActions: [],
+    itemUsages: []
   };
   const combined = `${intentText || ""} ${followupIntent || ""}`;
   const normalized = normalizeText(combined);
@@ -77,6 +78,16 @@ export function parseIntentDirectives({ playerId, intentText, followupIntent }) 
         type: "fake_info"
       });
     }
+  }
+
+  if (normalized.includes("能量棒") || normalized.includes("巧克力") || normalized.includes("吃")) {
+    directives.itemUsages.push({ playerId, itemId: "energy_bar", quantity: 1 });
+  }
+  if (normalized.includes("喝水") || normalized.includes("矿泉水") || normalized.includes("补水")) {
+    directives.itemUsages.push({ playerId, itemId: "half_water", quantity: 1 });
+  }
+  if (normalized.includes("充电宝") || normalized.includes("备用电池") || normalized.includes("充电")) {
+    directives.itemUsages.push({ playerId, itemId: "battery_pack", quantity: 1 });
   }
 
   return directives;

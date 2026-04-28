@@ -37,6 +37,7 @@ export function renderDemoPage() {
     .log { max-height: 260px; overflow: auto; font-size: 12px; color: #9fb1c6; background: #111827; border: 1px solid #374151; border-radius: 8px; padding: 8px; }
     .full { grid-column: 1 / -1; }
     .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .inventory-item { display: inline-block; margin: 4px 6px 0 0; padding: 4px 8px; border: 1px solid #334155; border-radius: 999px; font-size: 12px; color: #bfdbfe; background: #0f172a; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
   </style>
 </head>
@@ -155,6 +156,32 @@ export function renderDemoPage() {
       </section>
 
       <section class="card full">
+        <h3>物品栏（检阅 / 消耗）</h3>
+        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr auto;">
+          <div class="row">
+            <label>玩家</label>
+            <select id="invPlayer">
+              <option value="P1">P1 / Alice</option>
+              <option value="P2">P2 / Bob</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>物品</label>
+            <select id="invItem"></select>
+          </div>
+          <div class="row">
+            <label>操作</label>
+            <select id="invAction">
+              <option value="review">检阅</option>
+              <option value="use">消耗/使用</option>
+            </select>
+          </div>
+          <div class="row"><button id="invApplyBtn">执行物品操作</button></div>
+        </div>
+        <div id="invStatus" class="status">等待物品操作...</div>
+      </section>
+
+      <section class="card full">
         <h3>事件与关系变化</h3>
         <div id="metaView"></div>
       </section>
@@ -198,7 +225,12 @@ export function renderDemoPage() {
       sendPrivateBtn: document.getElementById("sendPrivateBtn"),
       chatViewer: document.getElementById("chatViewer"),
       refreshChatBtn: document.getElementById("refreshChatBtn"),
-      chatView: document.getElementById("chatView")
+      chatView: document.getElementById("chatView"),
+      invPlayer: document.getElementById("invPlayer"),
+      invItem: document.getElementById("invItem"),
+      invAction: document.getElementById("invAction"),
+      invApplyBtn: document.getElementById("invApplyBtn"),
+      invStatus: document.getElementById("invStatus")
     };
 
     const state = {
@@ -208,6 +240,9 @@ export function renderDemoPage() {
       shouldReconnect: false,
       reconnectTimer: null,
       lastSyncAt: null,
+      routeWaypoints: 6,
+      finished: false,
+      rescueRequested: false,
       players: [
         { id: "P1", nickname: "Alice", role: "待分配", inventory: [], stats: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20, deviceBattery: 95, signal: 65 } },
         { id: "P2", nickname: "Bob", role: "待分配", inventory: [], stats: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24, deviceBattery: 92, signal: 62 } }
@@ -310,17 +345,32 @@ export function renderDemoPage() {
       const rolePool = [
         {
           role: "资深驴友",
-          inventory: ["GORE-TEX 冲锋衣", "卫星电话", "地图", "高热量能量棒"],
+          inventory: [
+            { id: "shell_jacket", name: "GORE-TEX 冲锋衣", qty: 1, effect: "提升保温并降低失温惩罚", consumable: false },
+            { id: "sat_phone", name: "卫星电话", qty: 1, effect: "可触发救援中止结局", consumable: false },
+            { id: "paper_map", name: "地图", qty: 1, effect: "降低压力并提高路径判断", consumable: false },
+            { id: "energy_bar", name: "高热量能量棒", qty: 2, effect: "回复体力与饥饿", consumable: true }
+          ],
           patch: { stamina: +8, cold: +10, stress: -4, loadWeight: 18, hasShellJacket: true, hasSatellitePhone: true, hasMap: true, hasPowerBank: false, hasHeavyCamera: false }
         },
         {
           role: "小白游客",
-          inventory: ["普通卫衣", "半瓶矿泉水", "手机", "充电宝"],
+          inventory: [
+            { id: "hoodie", name: "普通卫衣", qty: 1, effect: "轻度保温", consumable: false },
+            { id: "half_water", name: "半瓶矿泉水", qty: 1, effect: "回复少量水分", consumable: true },
+            { id: "phone", name: "手机", qty: 1, effect: "基础通讯设备", consumable: false },
+            { id: "power_bank", name: "充电宝", qty: 1, effect: "回复设备电量", consumable: true }
+          ],
           patch: { stamina: -5, cold: -12, stress: +6, loadWeight: 8, hasShellJacket: false, hasSatellitePhone: false, hasMap: false, hasPowerBank: true, hasHeavyCamera: false }
         },
         {
           role: "摄影爱好者",
-          inventory: ["单反相机", "长焦镜头", "三脚架", "备用电池"],
+          inventory: [
+            { id: "camera", name: "单反相机", qty: 1, effect: "提升侦察能力但显著增加负重", consumable: false },
+            { id: "tele_lens", name: "长焦镜头", qty: 1, effect: "观测远处路况", consumable: false },
+            { id: "tripod", name: "三脚架", qty: 1, effect: "稳定拍摄，增加负重", consumable: false },
+            { id: "battery_pack", name: "备用电池", qty: 2, effect: "回复设备电量", consumable: true }
+          ],
           patch: { stamina: -3, cold: -2, stress: +2, loadWeight: 22, hasShellJacket: false, hasSatellitePhone: false, hasMap: true, hasPowerBank: true, hasHeavyCamera: true }
         }
       ];
@@ -336,8 +386,9 @@ export function renderDemoPage() {
     function renderPlayers() {
       els.playersView.innerHTML = state.players.map((p) => {
         const s = p.stats;
+        const items = (p.inventory || []).map((it) => '<span class="inventory-item">' + it.name + " x" + it.qty + "</span>").join("");
         return '<div style="margin-bottom:10px;"><b>' + p.nickname + "（" + p.role + "）</b>" +
-          '<div style="font-size:12px;color:#9fb1c6;margin-top:4px;">装备：' + (p.inventory?.join("、") || "无") + '</div>' +
+          '<div style="font-size:12px;color:#9fb1c6;margin-top:4px;">装备：' + (items || "无") + '</div>' +
           '<div class="stats">' +
           statBlock("体力", s.stamina) +
           statBlock("水分", s.water) +
@@ -350,12 +401,102 @@ export function renderDemoPage() {
       }).join("");
     }
 
+    function refreshInventoryOptions() {
+      const player = state.players.find((p) => p.id === els.invPlayer.value) || state.players[0];
+      const options = (player?.inventory || []).map((it) =>
+        '<option value="' + it.id + '">' + it.name + " x" + it.qty + "</option>"
+      );
+      els.invItem.innerHTML = options.length ? options.join("") : '<option value="">无可用物品</option>';
+    }
+
+    function applyInventoryAction() {
+      const player = state.players.find((p) => p.id === els.invPlayer.value);
+      if (!player) return;
+      const item = (player.inventory || []).find((it) => it.id === els.invItem.value);
+      if (!item) {
+        setStatus(els.invStatus, "没有可操作物品", "warn");
+        return;
+      }
+      if (els.invAction.value === "review") {
+        setStatus(els.invStatus, player.nickname + " 检阅「" + item.name + "」：" + item.effect, "good");
+        log("物品检阅：" + player.id + " -> " + item.name, "ok");
+        return;
+      }
+      if (item.qty <= 0) {
+        setStatus(els.invStatus, "该物品已耗尽", "warn");
+        return;
+      }
+      if (item.id === "energy_bar") {
+        player.stats.stamina = Math.min(100, player.stats.stamina + 10);
+        player.stats.hunger = Math.min(100, player.stats.hunger + 12);
+      } else if (item.id === "half_water") {
+        player.stats.water = Math.min(100, player.stats.water + 14);
+      } else if (item.id === "power_bank" || item.id === "battery_pack") {
+        player.stats.deviceBattery = Math.min(100, (player.stats.deviceBattery || 50) + 22);
+      } else if (item.id === "sat_phone") {
+        state.rescueRequested = true;
+        setStatus(els.invStatus, "已触发卫星电话求援：本局将以“救援中止”结束。", "warn");
+        log("触发卫星电话求援", "ok");
+        return;
+      } else {
+        setStatus(els.invStatus, "该物品不可消耗，建议使用“检阅”", "warn");
+        return;
+      }
+      if (item.consumable) item.qty = Math.max(0, item.qty - 1);
+      setStatus(els.invStatus, player.nickname + " 使用了「" + item.name + "」", "good");
+      log("物品消耗：" + player.id + " -> " + item.name, "ok");
+      refreshInventoryOptions();
+      renderPlayers();
+    }
+
     function renderMeta(roundResult) {
       const pills = [];
       (roundResult.events || []).forEach(e => pills.push('<span class="pill">事件: ' + e.title + '</span>'));
       (roundResult.teamIntel || []).forEach(i => pills.push('<span class="pill">情报: ' + i.title + '</span>'));
       (roundResult.trustChanges || []).forEach(t => pills.push('<span class="pill">信任变化 ' + t.delta + '</span>'));
       els.metaView.innerHTML = pills.length ? pills.join("") : '<span class="pill">本回合无显著事件</span>';
+    }
+
+    function getOrCreateInventoryItem(player, itemId, fallbackName, consumable = true) {
+      let found = (player.inventory || []).find((x) => x.id === itemId);
+      if (!found) {
+        found = { id: itemId, name: fallbackName, qty: 0, effect: "对话驱动新增物资", consumable };
+        player.inventory.push(found);
+      }
+      return found;
+    }
+
+    function applyRoundInventoryChanges(roundResult) {
+      const perPlayer = roundResult?.perPlayerResults || [];
+      for (const pr of perPlayer) {
+        const player = state.players.find((p) => p.id === pr.playerId);
+        if (!player) continue;
+        for (const used of (pr.consumedItems || [])) {
+          const item = (player.inventory || []).find((it) => it.id === used.itemId);
+          if (item) item.qty = Math.max(0, item.qty - Number(used.quantity || 1));
+        }
+      }
+
+      for (const t of (roundResult?.transferResults || [])) {
+        if (t.status !== "applied") continue;
+        const from = state.players.find((p) => p.id === t.fromPlayerId);
+        const to = state.players.find((p) => p.id === t.toPlayerId);
+        if (!from || !to) continue;
+        const moved = Number(t.movedAmount || 0);
+        if (moved <= 0) continue;
+        if (t.resource === "water") {
+          const fromItem = (from.inventory || []).find((it) => it.id === "half_water");
+          if (fromItem) fromItem.qty = Math.max(0, fromItem.qty - 1);
+          const toItem = getOrCreateInventoryItem(to, "half_water", "补给矿泉水");
+          toItem.qty += 1;
+        } else if (t.resource === "hunger") {
+          const fromItem = (from.inventory || []).find((it) => it.id === "energy_bar");
+          if (fromItem) fromItem.qty = Math.max(0, fromItem.qty - 1);
+          const toItem = getOrCreateInventoryItem(to, "energy_bar", "共享能量棒");
+          toItem.qty += 1;
+        }
+      }
+      refreshInventoryOptions();
     }
 
     function renderChat() {
@@ -399,6 +540,12 @@ export function renderDemoPage() {
         state.matchId = data.matchId;
         state.round = data.round || 1;
         state.lastSyncAt = null;
+        state.finished = false;
+        state.rescueRequested = false;
+        try {
+          const detail = await api("/v1/scenarios/" + data.scenarioId);
+          state.routeWaypoints = detail?.detail?.sampleWaypoints?.length || 6;
+        } catch {}
         setStatus(els.matchStatus, "房间已创建: " + data.matchId + " | 路线: " + data.scenario.name, "good");
         connectRealtime();
         log("创建房间成功 " + data.matchId, "ok");
@@ -436,6 +583,7 @@ export function renderDemoPage() {
           };
         }
         renderPlayers();
+        refreshInventoryOptions();
         setStatus(els.lobbyStatus, "两名玩家已加入。", "good");
         log("玩家加入完成", "ok");
       } catch (e) {
@@ -471,6 +619,10 @@ export function renderDemoPage() {
     });
 
     els.resolveBtn.addEventListener("click", async () => {
+      if (state.finished) {
+        setStatus(els.turnStatus, "本局已结束，请重置或新建房间。", "warn");
+        return;
+      }
       if (!state.matchId) {
         setStatus(els.turnStatus, "请先创建并开始房间。", "warn");
         return;
@@ -504,6 +656,7 @@ export function renderDemoPage() {
           if (p) p.stats = pr.nextState;
         });
       }
+      applyRoundInventoryChanges(data);
       state.round = data.match.round;
       setStatus(els.turnStatus, "回合结算完成，下一回合: " + state.round, "good");
       if (data.aiPhase?.broadcast) {
@@ -513,6 +666,32 @@ export function renderDemoPage() {
       renderPlayers();
       renderMeta(data);
       log("完成第 " + (state.round - 1) + " 回合结算", "ok");
+
+      const alivePlayers = state.players.filter((p) => p.stats.stamina > 0 && p.stats.cold > 0);
+      let autoReason = null;
+      if (alivePlayers.length === 0) {
+        autoReason = "all_dead";
+      } else if (state.rescueRequested) {
+        autoReason = "rescue_abort";
+      } else if ((state.round - 1) >= state.routeWaypoints) {
+        autoReason = "summit_success";
+      }
+      if (autoReason) {
+        const finish = await api("/v1/matches/" + state.matchId + "/finish", "POST", { reason: autoReason });
+        if (!finish.error) {
+          const summary = await api("/v1/match/" + state.matchId + "/summary");
+          state.finished = true;
+          if (summary?.diary) {
+            els.narration.textContent = summary.diary;
+          }
+          setStatus(
+            els.summaryStatus,
+            "自动结局：" + autoReason + " | 徒步日记已生成 | 勋章：" + summary.badge.title + "（" + summary.badge.level + "）",
+            autoReason === "summit_success" ? "good" : "warn"
+          );
+          log("自动触发结局：" + autoReason, "ok");
+        }
+      }
     });
 
     async function refreshChat() {
@@ -555,6 +734,8 @@ export function renderDemoPage() {
     });
 
     els.refreshChatBtn.addEventListener("click", refreshChat);
+    els.invPlayer.addEventListener("change", refreshInventoryOptions);
+    els.invApplyBtn.addEventListener("click", applyInventoryAction);
     els.chatViewer.addEventListener("change", async () => {
       if (state.ws) {
         try { state.ws.close(); } catch {}
@@ -622,9 +803,12 @@ export function renderDemoPage() {
       state.reconnectTimer = null;
       state.ws = null;
       state.players = [
-        { id: "P1", nickname: "Alice", stats: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20 } },
-        { id: "P2", nickname: "Bob", stats: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24 } }
+        { id: "P1", nickname: "Alice", role: "待分配", inventory: [], stats: { stamina: 80, water: 70, hunger: 70, cold: 80, stress: 20, deviceBattery: 95, signal: 65 } },
+        { id: "P2", nickname: "Bob", role: "待分配", inventory: [], stats: { stamina: 75, water: 65, hunger: 68, cold: 78, stress: 24, deviceBattery: 92, signal: 62 } }
       ];
+      state.finished = false;
+      state.rescueRequested = false;
+      state.routeWaypoints = 6;
       setStatus(els.matchStatus, "未创建房间");
       setStatus(els.lobbyStatus, "等待操作...");
       setStatus(els.turnStatus, "尚未开局");
@@ -638,12 +822,15 @@ export function renderDemoPage() {
       els.intentP2.value = "";
       els.followupP1.value = "";
       els.followupP2.value = "";
+      setStatus(els.invStatus, "等待物品操作...");
       renderPlayers();
+      refreshInventoryOptions();
       log("已重置页面状态");
     });
 
     loadScenarios();
     renderPlayers();
+    refreshInventoryOptions();
   </script>
 </body>
 </html>`;

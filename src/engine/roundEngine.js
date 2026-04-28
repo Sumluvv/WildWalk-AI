@@ -430,6 +430,28 @@ function applyDisclosureConsequences({
   return consequences;
 }
 
+function applyItemUsageDirectives(baseState, usages = []) {
+  const next = { ...baseState };
+  const applied = [];
+  for (const usage of usages) {
+    const itemId = usage?.itemId;
+    const quantity = Number(usage?.quantity || 1);
+    if (quantity <= 0) continue;
+    if (itemId === "energy_bar") {
+      next.stamina = clamp((next.stamina ?? 0) + 8 * quantity);
+      next.hunger = clamp((next.hunger ?? 0) + 10 * quantity);
+      applied.push({ itemId, quantity, effects: { stamina: 8 * quantity, hunger: 10 * quantity } });
+    } else if (itemId === "half_water") {
+      next.water = clamp((next.water ?? 0) + 12 * quantity);
+      applied.push({ itemId, quantity, effects: { water: 12 * quantity } });
+    } else if (itemId === "battery_pack") {
+      next.deviceBattery = clamp((next.deviceBattery ?? 100) + 18 * quantity);
+      applied.push({ itemId, quantity, effects: { deviceBattery: 18 * quantity } });
+    }
+  }
+  return { nextState: next, applied };
+}
+
 function buildNarrativePacket({
   round,
   environment,
@@ -506,8 +528,9 @@ export function resolveRound(input) {
       });
       transfers.push(...directives.transfers);
       betrayalActions.push(...directives.betrayalActions);
+      const withItemUsage = applyItemUsageDirectives(playerState, directives.itemUsages);
       const one = resolveSingleState({
-        state: playerState,
+        state: withItemUsage.nextState,
         action: primaryAction,
         secondaryAction,
         weatherMul,
@@ -518,6 +541,7 @@ export function resolveRound(input) {
         playerId,
         baseState: playerState,
         ...one,
+        consumedItems: withItemUsage.applied,
         intent: entry?.intent || "",
         followupIntent: entry?.followupIntent || "",
         visibleEvents: filterVisibleEvents(events, playerId)
