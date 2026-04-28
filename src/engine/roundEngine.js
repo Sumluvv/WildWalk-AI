@@ -6,6 +6,7 @@ import {
   WEATHER_COEFFICIENTS
 } from "./coefficients.js";
 import { generateRoundEvents } from "./events.js";
+import { filterVisibleEvents } from "./visibility.js";
 
 function clamp(value, min = STAT_MIN, max = STAT_MAX) {
   return Math.max(min, Math.min(max, value));
@@ -26,6 +27,7 @@ export function resolveRound(input) {
   const seed = Number(input?.seed || 1);
   const round = Number(input?.round || 1);
   const players = Array.isArray(input?.players) ? input.players : [];
+  const viewerPlayerId = input?.viewerPlayerId;
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
 
   let staminaLoss = 1.2 * weatherMul.staminaMul * slopeMul.staminaMul;
@@ -55,6 +57,7 @@ export function resolveRound(input) {
 
   const nextState = { stamina, water, hunger, cold, stress };
   const events = generateRoundEvents({ seed, round, players });
+  const visibleEvents = filterVisibleEvents(events, viewerPlayerId);
   return {
     numericDelta: {
       stamina: Number((nextState.stamina - state.stamina).toFixed(2)),
@@ -64,6 +67,7 @@ export function resolveRound(input) {
       stress: Number((nextState.stress - state.stress).toFixed(2))
     },
     nextState,
-    events
+    events,
+    visibleEvents
   };
 }

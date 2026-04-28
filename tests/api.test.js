@@ -20,13 +20,14 @@ test("GET /healthz returns ok", async (t) => {
   assert.equal(data.ok, true);
 });
 
-test("POST /v1/round/resolve returns numericDelta and nextState", async (t) => {
+test("POST /v1/round/resolve returns numericDelta and player-visible events", async (t) => {
   const { server, baseUrl } = await startTestServer();
   t.after(() => server.close());
 
   const payload = {
     seed: 11,
     round: 1,
+    viewerPlayerId: "A",
     players: [{ id: "A" }, { id: "B" }],
     state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
     environment: { weather: "cloudy", slope: "flat" }
@@ -43,7 +44,14 @@ test("POST /v1/round/resolve returns numericDelta and nextState", async (t) => {
   assert.ok(data.numericDelta);
   assert.ok(data.nextState);
   assert.ok(Array.isArray(data.events));
+  assert.ok(Array.isArray(data.visibleEvents));
   assert.equal(typeof data.nextState.stamina, "number");
+
+  for (const event of data.visibleEvents) {
+    if (event.visibility === "private") {
+      assert.equal(event.targetPlayerId, "A");
+    }
+  }
 });
 
 test("POST /v1/round/resolve returns 400 for invalid JSON", async (t) => {

@@ -82,3 +82,20 @@ test("private events target a valid player", () => {
     assert.ok(["P1", "P2"].includes(e.targetPlayerId));
   }
 });
+
+test("visibleEvents only includes public or viewer private events", () => {
+  const result = resolveRound({
+    seed: 73,
+    round: 9,
+    viewerPlayerId: "P1",
+    players: [{ id: "P1" }, { id: "P2" }],
+    state: { stamina: 80, water: 75, hunger: 70, cold: 85, stress: 20 },
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  for (const event of result.visibleEvents) {
+    if (event.visibility === "private") {
+      assert.equal(event.targetPlayerId, "P1");
+    }
+  }
+});
