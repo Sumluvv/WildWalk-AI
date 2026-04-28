@@ -68,6 +68,48 @@ function resolveSingleState({ state, action, weatherMul, slopeMul }) {
   };
 }
 
+function recalculateDelta(baseState, nextState) {
+  return {
+    stamina: Number((nextState.stamina - baseState.stamina).toFixed(2)),
+    water: Number((nextState.water - baseState.water).toFixed(2)),
+    hunger: Number((nextState.hunger - baseState.hunger).toFixed(2)),
+    cold: Number((nextState.cold - baseState.cold).toFixed(2)),
+    stress: Number((nextState.stress - baseState.stress).toFixed(2))
+  };
+}
+
+function applyResourceTransfers(perPlayerResults, transfers = []) {
+  if (!Array.isArray(transfers) || transfers.length === 0) return perPlayerResults;
+
+  const byId = new Map(perPlayerResults.map((r) => [r.playerId, r]));
+
+  for (const transfer of transfers) {
+    const fromId = transfer?.fromPlayerId;
+    const toId = transfer?.toPlayerId;
+    const resource = transfer?.resource;
+    const amount = Number(transfer?.amount || 0);
+    if (!fromId || !toId || fromId === toId) continue;
+    if (!["water", "hunger"].includes(resource)) continue;
+    if (amount <= 0) continue;
+
+    const from = byId.get(fromId);
+    const to = byId.get(toId);
+    if (!from || !to) continue;
+
+    const movable = Math.min(amount, from.nextState[resource]);
+    if (movable <= 0) continue;
+
+    from.nextState[resource] = clamp(from.nextState[resource] - movable);
+    to.nextState[resource] = clamp(to.nextState[resource] + movable);
+  }
+
+  for (const player of perPlayerResults) {
+    player.numericDelta = recalculateDelta(player.baseState, player.nextState);
+  }
+
+  return perPlayerResults;
+}
+
 export function resolveRound(input) {
   const state = { ...INITIAL_STATS, ...(input?.state || {}) };
   const weather = input?.environment?.weather || "cloudy";
@@ -76,6 +118,7 @@ export function resolveRound(input) {
   const round = Number(input?.round || 1);
   const players = Array.isArray(input?.players) ? input.players : [];
   const playerActions = Array.isArray(input?.playerActions) ? input.playerActions : [];
+  const transfers = Array.isArray(input?.transfers) ? input.transfers : [];
   const viewerPlayerId = input?.viewerPlayerId;
   const action = input?.action;
   const { weatherMul, slopeMul } = getMultipliers(weather, slope);
@@ -95,10 +138,17 @@ export function resolveRound(input) {
 
       return {
         playerId,
+        baseState: playerState,
         ...one,
         visibleEvents: filterVisibleEvents(events, playerId)
       };
     });
+
+    applyResourceTransfers(perPlayerResults, transfers);
+
+    for (const player of perPlayerResults) {
+      delete player.baseState;
+    }
 
     return {
       events,

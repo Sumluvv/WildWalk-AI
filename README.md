@@ -75,6 +75,7 @@
 - `players[]`: 玩家列表（用于私有事件定向分发）
 - `action`: 单人模式行动（`move/camp/hydrate/check`）
 - `playerActions[]`: 多人模式行动数组（每项含 `playerId + action + state`）
+- `transfers[]`: 多人资源分享数组（每项含 `fromPlayerId + toPlayerId + resource + amount`）
 
 ### 回合输出（RoundResult）
 
@@ -95,6 +96,7 @@
   - 返回（多人）：`{ events, visibleEvents, perPlayerResults[] }`
   - 说明：`visibleEvents` 已按 `viewerPlayerId` 过滤，仅包含该玩家可见事件（公开 + 该玩家私有）
   - MVP 行动枚举：`move`（前进）`camp`（扎营）`hydrate`（补水）`check`（检查装备）
+  - MVP 分享资源：`resource` 支持 `water` 或 `hunger`
 
 ## 5. 测试与验证方法（MVP 目标）
 
@@ -137,6 +139,7 @@
 - 新增玩家视角事件过滤（`viewerPlayerId -> visibleEvents`），便于客户端直接渲染。
 - 新增行动输入 `action` 对数值结算的直接影响（前进/扎营/补水/检查）。
 - 新增多人 `playerActions[]` 逐玩家结算输出（`perPlayerResults`），对接多人回合制。
+- 新增多人资源分享 `transfers[]` 联动结算（如分享水/食物）。
 
 ### 已知风险与待改进
 

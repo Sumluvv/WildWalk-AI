@@ -92,6 +92,7 @@ test("POST /v1/round/resolve supports multiplayer playerActions", async (t) => {
         state: { stamina: 50, water: 60, hunger: 60, cold: 65, stress: 30 }
       }
     ],
+    transfers: [{ fromPlayerId: "P1", toPlayerId: "P2", resource: "water", amount: 8 }],
     environment: { weather: "cloudy", slope: "rolling" }
   };
 
@@ -107,4 +108,9 @@ test("POST /v1/round/resolve supports multiplayer playerActions", async (t) => {
   assert.equal(data.perPlayerResults.length, 2);
   assert.equal(data.perPlayerResults[0].playerId, "P1");
   assert.equal(data.perPlayerResults[1].playerId, "P2");
+
+  const p1 = data.perPlayerResults.find((p) => p.playerId === "P1");
+  const p2 = data.perPlayerResults.find((p) => p.playerId === "P2");
+  assert.ok(p1.nextState.water < 75);
+  assert.ok(p2.nextState.water > 60);
 });

@@ -163,3 +163,32 @@ test("playerActions returns per-player results", () => {
   assert.ok(result.perPlayerResults[0].numericDelta);
   assert.ok(result.perPlayerResults[1].nextState);
 });
+
+test("transfers move water between players in multiplayer mode", () => {
+  const result = resolveRound({
+    seed: 100,
+    round: 3,
+    players: [{ id: "P1" }, { id: "P2" }],
+    playerActions: [
+      {
+        playerId: "P1",
+        action: "camp",
+        state: { stamina: 80, water: 80, hunger: 70, cold: 85, stress: 20 }
+      },
+      {
+        playerId: "P2",
+        action: "move",
+        state: { stamina: 80, water: 20, hunger: 70, cold: 85, stress: 20 }
+      }
+    ],
+    transfers: [{ fromPlayerId: "P1", toPlayerId: "P2", resource: "water", amount: 10 }],
+    environment: { weather: "cloudy", slope: "flat" }
+  });
+
+  const p1 = result.perPlayerResults.find((p) => p.playerId === "P1");
+  const p2 = result.perPlayerResults.find((p) => p.playerId === "P2");
+  assert.ok(p1);
+  assert.ok(p2);
+  assert.ok(p1.nextState.water < 80);
+  assert.ok(p2.nextState.water > 20);
+});
